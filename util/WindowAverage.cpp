@@ -26,22 +26,28 @@ WindowAverage::WindowAverage(uint16_t windowSizeLog2, int16_t* windowArea)
 void WindowAverage::reset() {
     _accumulator = 0;
     _windowPtr = 0;
-    uint16_t areaSize = 1 << _windowSizeLog2;
-    for (uint16_t i = 0; i < areaSize; i++) {
-        _windowArea[i] = 0;
+    if (_windowArea != 0) {
+        uint16_t areaSize = 1 << _windowSizeLog2;
+        for (uint16_t i = 0; i < areaSize; i++) {
+            _windowArea[i] = 0;
+        }
     }
 }
 
 int16_t WindowAverage::sample(int16_t s) {
-    uint16_t ptrMask = (1 << _windowSizeLog2) - 1;
-    _accumulator += s;
-    _accumulator -= _windowArea[_windowPtr];
-    _windowArea[_windowPtr] = s;
-    // Increment and wrap
-    _windowPtr = (_windowPtr + 1) & ptrMask;
-    return _accumulator >> _windowSizeLog2;
+    if (_windowArea == 0) {
+        return s;
+    } else {
+        uint16_t ptrMask = (1 << _windowSizeLog2) - 1;
+        _accumulator += s;
+        _accumulator -= _windowArea[_windowPtr];
+        _windowArea[_windowPtr] = s;
+        // Increment and wrap
+        _windowPtr = (_windowPtr + 1) & ptrMask;
+        // Do the average division
+        return _accumulator >> _windowSizeLog2;
+    }
 }
-
 
 }
 

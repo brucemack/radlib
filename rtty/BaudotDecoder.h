@@ -60,6 +60,10 @@ requency as the frequency you are operating on. For example, if you
 class BaudotDecoder {
 public:
 
+    /**
+     * @param windowArea Space used to hold the sample history to support
+     *   averaging/filtering. Or 0 if no filtering is needed.
+     */ 
     BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100,
         uint16_t windowSizeLog2, int16_t* windowArea);
 
@@ -68,9 +72,11 @@ public:
     void reset();
 
     /**
+     * Call this on the sample cadence!
+     * 
      * Symbol 1 = Mark (High)
      * Symbol 0 = Space (Low)
-    */
+     */
     void processSample(uint8_t symbol);
 
 private:    

@@ -27,6 +27,8 @@ public:
      * @param windowSizeLog2 The size of the window is expressed in log terms
      *   (i.e. number of bits).  So if the window has 8 entries then the 
      *   windowSizeLog2 should be 3.
+     * @param windowArea Data area used to maintain history, or zero if 
+     *   no averaging is needed.
     */
     WindowAverage(uint16_t windowSizeLog2, int16_t* windowArea);
 
