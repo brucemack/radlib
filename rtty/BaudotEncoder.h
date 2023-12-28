@@ -21,7 +21,17 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 namespace radlib {
 
-void transmitBaudot(const char* data, FSKModulator& mod, uint32_t symbolLengthUs);
+/**
+ * Transmits a null-terminated ASCII message using Baudot encoding. The 
+ * assumption is that the receicer starts in LTRS mode. The receiver 
+ * will be left in LTRS mode at the end of the transmission.
+ * 
+ * @param msg The null-terminated message in ASCII text.
+ * @param mod The FSK modulator used to generate the symbols.
+ * @param symbolLengthUs The length of each symbol in microseconds. Standard 
+ *   45.45 baud uses a symbol length of 22,002 microseconds.
+*/
+void transmitBaudot(const char* msg, FSKModulator& mod, uint32_t symbolLengthUs);
 
 }
 

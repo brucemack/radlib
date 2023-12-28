@@ -24,7 +24,6 @@ TestFSKModulator2::TestFSKModulator2(uint16_t sampleRate,
     uint16_t baudRateTimes100, 
     uint8_t* sampleData, uint32_t sampleDataSize) 
 :   _sampleRate(sampleRate),
-    //_baudRateTime100(baudRateTimes100),
     _sampleData(sampleData),
     _sampleDataSize(sampleDataSize),
     _sampleDataPtr(0) {
