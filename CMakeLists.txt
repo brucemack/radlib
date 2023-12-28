@@ -9,6 +9,7 @@ add_executable(unit-test-1
   tests/TestFSKModulator.cpp 
   rtty/BaudotDecoder.cpp 
   rtty/BaudotEncoder.cpp 
+  util/WindowAverage.cpp 
 )
 
 add_executable(unit-test-2

@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <cstdint>
 #include "../util/DataListener.h"
+#include "../util/WindowAverage.h"
 
 namespace radlib {
 
@@ -59,7 +60,8 @@ requency as the frequency you are operating on. For example, if you
 class BaudotDecoder {
 public:
 
-    BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100);
+    BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100,
+        uint16_t windowSizeLog2, int16_t* windowArea);
 
     void setDataListener(DataListener* l) { _listener = l; };
 
@@ -69,15 +71,23 @@ public:
      * Symbol 1 = Mark (High)
      * Symbol 0 = Space (Low)
     */
-    void processSymbol(uint8_t symbol);
+    void processSample(uint8_t symbol);
 
 private:    
 
-    uint16_t _sampleRate;
-    uint16_t _baudRateTimes100;
-    BaudotMode _mode = BaudotMode::LTRS;
-
     DataListener* _listener;
+
+    // The number of samples per data bit. This is computed by 
+    // dividing the sample rate by the baud rate.
+    const uint16_t _samplesPerSymbol;
+
+    BaudotMode _mode = BaudotMode::LTRS;
+    WindowAverage _avg;
+    int16_t _lastSymbol;
+    uint16_t _state;
+    uint16_t _sampleCount;
+    uint8_t _symbolCount;
+    uint8_t _symbolAcc;
 };
 
 }
