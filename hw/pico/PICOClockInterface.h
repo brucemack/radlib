@@ -13,33 +13,19 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with 
 this program. If not, see <https://www.gnu.org/licenses/>.
 */
-#ifndef _TestI2CInterface_h
-#define _TestI2CInterface_h
+#ifndef _PICOClockInterface_h
+#define _PICOClockInterface_h
 
-#include <iostream>
-#include "../util/I2CInterface.h"
+#include <cstdint>
+#include "../../util/ClockInterface.h"
 
 namespace radlib {
 
-/**
- * A dummy implementation that prints data activity to a stream. Useful
- * for unit testing.
-*/
-class TestI2CInterface : public I2CInterface {
+class PICOClockInterface : public ClockInterface {
 public:
 
-    TestI2CInterface(std::ostream& str);
-
-    virtual void write(uint8_t addr, uint8_t data);
-    virtual void write(uint8_t addr, uint8_t* data, uint16_t len);
-    virtual uint8_t read(uint8_t addr);
-
-    uint16_t getCycleCount() const { return _cycleCount; };
-
-private:
-
-    std::ostream& _str;
-    uint16_t _cycleCount = 0;
+    virtual void sleepMs(uint16_t ms) const;
+    virtual void sleepUs(uint16_t us) const;
 };
 
 }

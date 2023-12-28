@@ -13,22 +13,22 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with 
 this program. If not, see <https://www.gnu.org/licenses/>.
 */
-#ifndef _TestI2CInterface_h
-#define _TestI2CInterface_h
+#ifndef _PICOI2CInterface_h
+#define _PICOI2CInterface_h
 
 #include <iostream>
-#include "../util/I2CInterface.h"
+#include "../../util/I2CInterface.h"
 
 namespace radlib {
 
 /**
- * A dummy implementation that prints data activity to a stream. Useful
- * for unit testing.
-*/
-class TestI2CInterface : public I2CInterface {
+ * Interface with PICO hardware
+ */
+class PICOI2CInterface : public I2CInterface {
 public:
 
-    TestI2CInterface(std::ostream& str);
+    PICOI2CInterface(i2c_inst_t* hw, std::ostream& str);
+    virtual ~PICOI2CInterface();
 
     virtual void write(uint8_t addr, uint8_t data);
     virtual void write(uint8_t addr, uint8_t* data, uint16_t len);
@@ -38,6 +38,7 @@ public:
 
 private:
 
+    i2c_inst_t* _hw;
     std::ostream& _str;
     uint16_t _cycleCount = 0;
 };
