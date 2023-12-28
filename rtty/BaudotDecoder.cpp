@@ -24,6 +24,10 @@ namespace radlib {
 const uint8_t BAUDOT_LTRS = 31;
 const uint8_t BAUDOT_FIGS = 27;
 
+// This is a grid that maps Baudot characters to ASCII characters.  
+// The first column is used in "letters" (LTRS) mode and the 
+// second column is used in "figures" (FIGS) mode.
+
 const char BAUDOT_TO_ASCII_MAP[32][2] = {
     {   0, 0   },
     { 'E', '3' },
@@ -64,13 +68,21 @@ BaudotDecoder::BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100,
 :   _samplesPerSymbol((100 * sampleRate) / baudRateTimes100),
     _mode(BaudotMode::LTRS),
     _avg(windowSizeLog2, windowArea),
-    _state(0) {
+    _lastSymbol(0),
+    _state(0),
+    _sampleCount(0),
+    _symbolCount(0),
+    _symbolAcc(0) {
 }
 
 void BaudotDecoder::reset() {
     _mode = BaudotMode::LTRS;
     _state = 0;
     _avg.reset();
+    _lastSymbol = 0;
+    _sampleCount = 0;
+    _symbolCount = 0;
+    _symbolAcc = 0;
 }
 
 /**
