@@ -42,6 +42,18 @@ assumes this is a Start bit.  It then assumes that the tone 1/45.45
 seconds later represents the first bit of the Baudot character, the 
 one 2/45.45 seconds later represents the second bit of the Baudot 
 character, and so on.
+
+
+http://ac4m.us/RTTY.html
+
+The lower RF frequency is known as the SPACE frequency and the upper 
+RF frequency is known as the MARK frequency. The difference between 
+the two is known as the SHIFT. For amateur radio, the SHIFT has been 
+standardized at 170 Hz. It is customary to refer to the MARK f
+requency as the frequency you are operating on. For example, if you
+ say you are transmitting on 14080.00 kHz, that means your MARK 
+ frequency is 14080.00 kHz and your SPACE frequency is 170 Hz lower, 
+ or 14079.83 kHz. 
 */
 
 class BaudotDecoder {
@@ -63,7 +75,7 @@ private:
 
     uint16_t _sampleRate;
     uint16_t _baudRateTimes100;
-    bool _inFigs;
+    BaudotMode _mode = BaudotMode::LTRS;
 
     DataListener* _listener;
 };

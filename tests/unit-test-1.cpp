@@ -5,7 +5,8 @@
 using namespace std;
 using namespace radlib;
 
-uint32_t symbolUs = 21978;
+// This is 45.45 baud
+uint32_t symbolUs = 22002;
 
 int main(int,const char**) {
     cout << "Hello RTTY" << endl;
