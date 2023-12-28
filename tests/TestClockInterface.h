@@ -1,10 +1,4 @@
-Overview
-========
-A library for building digital radios.
-
-License
-=======
-
+/*
 Copyright (C) 2023 - Bruce MacKinnon KC1FSZ
 
 This program is free software: you can redistribute it and/or modify it under 
@@ -18,3 +12,24 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with 
 this program. If not, see <https://www.gnu.org/licenses/>.
+*/
+#ifndef _TestClockInterface_h
+#define _TestClockInterface_h
+
+#include <cstdint>
+#include "../util/ClockInterface.h"
+
+namespace radlib {
+
+class TestClockInterface : public ClockInterface {
+public:
+
+    TestClockInterface();
+
+    virtual void sleepMs(uint16_t ms) const;
+    virtual void sleepUs(uint16_t us) const;
+};
+
+}
+
+#endif

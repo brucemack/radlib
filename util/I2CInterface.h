@@ -1,10 +1,4 @@
-Overview
-========
-A library for building digital radios.
-
-License
-=======
-
+/*
 Copyright (C) 2023 - Bruce MacKinnon KC1FSZ
 
 This program is free software: you can redistribute it and/or modify it under 
@@ -18,3 +12,23 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with 
 this program. If not, see <https://www.gnu.org/licenses/>.
+*/
+#ifndef _I2CInterface_h
+#define _I2CInterface_h
+
+#include <cstdint>
+
+namespace radlib {
+
+class I2CInterface {
+public:
+
+    virtual void write(uint8_t addr, uint8_t data) = 0;
+    virtual void write(uint8_t addr, uint8_t* data, uint16_t len) = 0;
+    virtual uint8_t read(uint8_t addr) = 0;
+
+};
+
+}
+
+#endif
