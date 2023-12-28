@@ -22,7 +22,11 @@ static void sendBaudotChar(FSKModulator& mod, uint32_t symbolLengthUs, uint8_t c
 }
 
 void transmitBaudot(const char* msg, FSKModulator& mod, uint32_t symbolLengthUs) {
-    
+
+    // Send a short mark at the beginning so that we can see the 
+    // transition of the initial start bit.    
+    mod.sendMark(symbolLengthUs);
+
     // We are assuming that the receiver always starts in LTRS mode
     BaudotMode mode = BaudotMode::LTRS;
 

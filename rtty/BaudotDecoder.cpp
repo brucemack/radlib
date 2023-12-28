@@ -120,12 +120,23 @@ void BaudotDecoder::processSample(uint8_t symbol) {
             _sampleCount = 0;
             // Look for the completion of a character
             if (_symbolCount == 5) {
-                // Convert from Baudot->ASCII
-                char asciiChar = 
-                    BAUDOT_TO_ASCII_MAP[(_symbolAcc & 0b11111)]
-                                       [(_mode == BaudotMode::LTRS) ? 0 : 1];
-                // Report the character
-                _listener->received(asciiChar);
+                // Look for shift codes
+                if (_symbolAcc == BAUDOT_LTRS) {
+                    _mode = BaudotMode::LTRS;
+                } 
+                // Look for shift codes
+                else if (_symbolAcc == BAUDOT_FIGS) {
+                    _mode = BaudotMode::FIGS;
+                } 
+                // Everything else is a normal character
+                else {
+                    // Convert from Baudot->ASCII
+                    char asciiChar = 
+                        BAUDOT_TO_ASCII_MAP[(_symbolAcc & 0b11111)]
+                                        [(_mode == BaudotMode::LTRS) ? 0 : 1];
+                    // Report the character
+                    _listener->received(asciiChar);
+                }
                 // Start to wait for the stop bit to go by
                 _state = 4;
             } else {

@@ -7,6 +7,7 @@ add_compile_options(-fstack-protector-all -Wall -Wpedantic -g)
 add_executable(unit-test-1
   tests/unit-test-1.cpp 
   tests/TestFSKModulator.cpp 
+  tests/TestFSKModulator2.cpp 
   rtty/BaudotDecoder.cpp 
   rtty/BaudotEncoder.cpp 
   util/WindowAverage.cpp 
