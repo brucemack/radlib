@@ -34,11 +34,23 @@ void TestFSKModulator2::sendSilence(uint32_t durationUs) {
     sendSpace(durationUs);
 }
 
+static uint8_t randomFlip(uint8_t desiredSymbol) {
+    if (rand() % 100 > 92) {
+        if (desiredSymbol == 1) {
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        return desiredSymbol;
+    }
+}
+
 void TestFSKModulator2::sendMark(uint32_t durationUs) {
     uint32_t samples = (_sampleRate * durationUs) / 1000000;
     for (uint32_t i = 0; i < samples; i++) {
         if (_sampleDataPtr < _sampleDataSize) {
-            _sampleData[_sampleDataPtr++] = 1;
+            _sampleData[_sampleDataPtr++] = randomFlip(1);
         }
     }
 }
@@ -47,7 +59,7 @@ void TestFSKModulator2::sendSpace(uint32_t durationUs) {
     uint32_t samples = (_sampleRate * durationUs) / 1000000;
     for (uint32_t i = 0; i < samples; i++) {
         if (_sampleDataPtr < _sampleDataSize) {
-            _sampleData[_sampleDataPtr++] = 0;
+            _sampleData[_sampleDataPtr++] = randomFlip(0);
         }
     }
 }

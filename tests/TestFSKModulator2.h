@@ -21,6 +21,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 namespace radlib {
 
+/**
+ * NOTE: This introduces some random sample errors!
+ */
 class TestFSKModulator2 : public FSKModulator {
 public:
 

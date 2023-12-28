@@ -96,8 +96,8 @@ int main(int,const char**) {
         assert(l.get() == "CQ");
     }
 
+    // Encode a message at the full sample rate and then decode it.
     {
-        // Encode at the full sample rate
         uint16_t sampleRate = 2000;
         uint16_t baudRateTimes100 = 4545;
         uint8_t sampleData[8000];
@@ -106,13 +106,13 @@ int main(int,const char**) {
 
         TestFSKModulator2 mod2(sampleRate, baudRateTimes100, sampleData, sampleDataSize);
         transmitBaudot(msg, mod2, symbolUs);
-        //transmitBaudot("C", mod2, symbolUs);
         // Make sure we didn't overflow
         assert(mod2.getSamplesUsed() < sampleDataSize);
 
-        int16_t windowArea[4];
+        const uint16_t windowAreaSizeLog2 = 3;
+        int16_t windowArea[1 << windowAreaSizeLog2];
         Listener l;
-        BaudotDecoder dec(2000, 4545, 2, windowArea);
+        BaudotDecoder dec(sampleRate, baudRateTimes100, windowAreaSizeLog2, windowArea);
         dec.setDataListener(&l);
 
         // Play all of the samples into the decoder
