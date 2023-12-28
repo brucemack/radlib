@@ -1,4 +1,8 @@
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <cassert>
+
 #include "TestFSKModulator.h"
 #include "../util/DataListener.h"
 #include "../rtty/BaudotEncoder.h"
@@ -13,10 +17,20 @@ uint32_t symbolUs = 22002;
 // Test listener
 class Listener : public DataListener {
 public:
+
     void received(char asciiChar) {
-        cout << asciiChar;
-        cout.flush();
+        _str << asciiChar;
     }
+
+    string get() {
+        string r = _str.str();
+        _str.clear();
+        return r;
+    }
+
+private:
+
+    ostringstream _str;
 };
 
 static void run(BaudotDecoder& dec, uint8_t symbol, uint16_t copies) {
@@ -62,6 +76,7 @@ int main(int,const char**) {
     // Stop bit
     run(dec, 1, 66);
 
+    assert(l.get() == "CQ");
 }
 
 
