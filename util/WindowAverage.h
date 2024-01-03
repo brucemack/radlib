@@ -35,6 +35,10 @@ public:
     void reset();
     int16_t sample(int16_t s);
 
+    int16_t getAvg() const;
+    int16_t getMin() const;
+    int16_t getMax() const;
+
 private:
 
     const uint16_t _windowSizeLog2;

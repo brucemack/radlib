@@ -30,7 +30,12 @@ int main(int,const char**) {
     assert(2 == avg.sample(4));
     assert(3 == avg.sample(4));
     assert(4 == avg.sample(4));
+    assert(4 == avg.getAvg());
+    assert(4 == avg.getMax());
+    assert(4 == avg.getMin());
+
     assert(3 == avg.sample(0));
+    assert(0 == avg.getMin());
     assert(2 == avg.sample(0));
     assert(1 == avg.sample(0));
     assert(0 == avg.sample(0));

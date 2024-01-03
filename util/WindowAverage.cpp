@@ -13,6 +13,7 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with 
 this program. If not, see <https://www.gnu.org/licenses/>.
 */
+#include <algorithm>    // std::max
 #include "WindowAverage.h"
 
 namespace radlib {
@@ -47,6 +48,32 @@ int16_t WindowAverage::sample(int16_t s) {
         // Do the average division
         return _accumulator >> _windowSizeLog2;
     }
+}
+
+int16_t WindowAverage::getAvg() const {
+    return _accumulator >> _windowSizeLog2;
+}
+
+int16_t WindowAverage::getMin() const {
+    int16_t min = 0x7fff;
+    if (_windowArea) {
+        uint16_t areaSize = 1 << _windowSizeLog2;
+        for (uint16_t i = 0; i < areaSize; i++) {
+            min = std::min(min, _windowArea[i]);
+        }
+    }
+    return min;
+}
+
+int16_t WindowAverage::getMax() const {
+    int16_t max = -32767;
+    if (_windowArea) {
+        uint16_t areaSize = 1 << _windowSizeLog2;
+        for (uint16_t i = 0; i < areaSize; i++) {
+            max = std::max(max, _windowArea[i]);
+        }
+    }
+    return max;
 }
 
 }
