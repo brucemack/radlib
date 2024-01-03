@@ -17,3 +17,9 @@ add_executable(unit-test-2
   tests/unit-test-2.cpp
   util/WindowAverage.cpp 
 )
+
+add_executable(unit-test-3
+  tests/unit-test-3.cpp
+  tests/TestFSKModulator.cpp 
+  morse/MorseEncoder.cpp 
+)
