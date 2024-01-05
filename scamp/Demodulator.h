@@ -44,7 +44,9 @@ public:
     void setListener(DemodulatorListener* listener) { _listener = listener; };
 
     /**
-     * Call this depending on the mode being used.
+     * Call this depending on the mode being used.  IMPORTANT: You need
+     * to call setFrequencyLock() after this (or go through an auto-lock
+     * sequence) for this to take effect.
      */
     void setSymbolSpread(float spreadHz) { _symbolSpreadHz = spreadHz; };
 
@@ -55,17 +57,24 @@ public:
     void processSample(q15 sample);
 
     /**
-     * Call this function to clear the frequency lock and the data 
-     * synchronization.
+     * Call this function to clear the frequency lock and any other internal
+     * state.
     */
     virtual void reset();
 
+    /**
+     * Locks the demodulator on the specified mark frequency.
+     */
     void setFrequencyLock(float markFreqHz);
 
     bool isFrequencyLocked() const { return _frequencyLocked; }
+
+    void setAutoLockEnabled(bool en) { _autoLockEnabled = en; }
+
     int32_t getPLLIntegration() const;
     float getLastDCPower() const { return _lastDCPower; };
-    uint16_t getMarkFreq() const;
+
+    float getMarkFreq() const;
 
 protected:
 
@@ -128,8 +137,9 @@ private:
     // or whether it is in frequency acquisition mode.
     bool _frequencyLocked = false;
 
-    // The bin that has been selected to represent "mark"
-    uint16_t _lockedBinMark = 0;
+    // The frequency that has been selected to represent "mark"
+    float _lockedMarkFreq = 0;
+
     uint16_t _blockCount = 0;
     uint8_t _activeSymbol = 0;
 

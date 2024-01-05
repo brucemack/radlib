@@ -54,6 +54,7 @@ Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2
 void Demodulator::setFrequencyLock(float lockedMarkHz) {
 
     _frequencyLocked = true;
+    _lockedMarkFreq = lockedMarkHz;
 
     make_complex_tone(_demodulatorTone[0], _demodulatorToneN, 
         _sampleFreq, lockedMarkHz - _symbolSpreadHz, 0.5);
@@ -105,7 +106,6 @@ void Demodulator::processSample(q15 sample) {
 
         // Find the largest power. Notice that we ignore some low bins (DC)
         // since that's not relevant to the spectral analysis.
-        //const uint16_t maxBin = max_idx(_fftResult, _firstBin, _fftN / 2);
         const uint16_t maxBin = max_idx_2(_fftResult, _firstBin, _fftN / 2);
 
          // Capture DC magnitude for diagnostics
@@ -170,11 +170,8 @@ void Demodulator::processSample(q15 sample) {
                     hitPct > 0.75 && 
                     maxBinPowerFract > 0.20) {
 
-                    _frequencyLocked = true;
-                    _lockedBinMark = maxBin;
-
                     // Convert the bin number to a frequency in Hz
-                    float lockedMarkHz = (float)_lockedBinMark * (float)_sampleFreq / (float)_fftN;
+                    float lockedMarkHz = (float)maxBin * (float)_sampleFreq / (float)_fftN;
 
                     setFrequencyLock(lockedMarkHz);
                 }
@@ -265,8 +262,8 @@ void Demodulator::processSample(q15 sample) {
     }
 }
 
-uint16_t Demodulator::getMarkFreq() const {
-    return (_lockedBinMark * _sampleFreq) / _fftN;
+float Demodulator::getMarkFreq() const {
+    return _lockedMarkFreq;
 }
 
 }
