@@ -23,3 +23,43 @@ add_executable(unit-test-3
   tests/TestFSKModulator.cpp 
   morse/MorseEncoder.cpp 
 )
+
+# Desktop build
+add_executable(unit-test-4
+  tests/scamp/unit-test-4.cpp 
+  tests/scamp/TestModem.cpp 
+  tests/scamp/TestModem2.cpp 
+  tests/scamp/TestDemodulatorListener.cpp
+  scamp/Symbol6.cpp 
+  scamp/CodeWord12.cpp 
+  scamp/CodeWord24.cpp 
+  scamp/Frame30.cpp 
+  scamp/Util.cpp 
+  scamp/ClockRecoveryPLL.cpp
+  scamp/ClockRecoveryDLL.cpp
+  scamp/Demodulator.cpp
+  util/FileModulator.cpp 
+  util/fixed_math.cpp 
+  util/fixed_fft.cpp 
+  util/dsp_util.cpp 
+)
+
+add_executable(unit-test-7a
+  tests/scamp/unit-test-7a.cpp 
+  tests/scamp/TestModem.cpp 
+  tests/scamp/TestModem2.cpp 
+  tests/scamp/TestDemodulatorListener.cpp
+  scamp/Symbol6.cpp 
+  scamp/CodeWord12.cpp 
+  scamp/CodeWord24.cpp 
+  scamp/Frame30.cpp 
+  scamp/Util.cpp 
+  scamp/ClockRecoveryPLL.cpp
+  scamp/ClockRecoveryDLL.cpp
+  scamp/Demodulator.cpp
+  util/FileModulator.cpp 
+  util/fixed_math.cpp 
+  util/fixed_fft.cpp 
+  util/dsp_util.cpp 
+)
+
