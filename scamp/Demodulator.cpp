@@ -35,12 +35,7 @@ Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2
     _fftWindow(fftWindow),
     _fftResult(fftResultSpace),
     _fft(_fftN, fftTrigTable),
-    _dataClockRecovery(sampleFreq),
     _buffer(bufferSpace) { 
-
-    // FSK SCAMP is 33.3 bits/second
-    _dataClockRecovery.setClockFrequency(33);
-    //_dataClockRecovery.setBitFrequencyHint(33);
 
     // Build the Hann window for the FFT (raised cosine) if a space has 
     // been provided for it.
@@ -56,25 +51,21 @@ Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2
     memset((void*)_maxCorrHistory, 0, sizeof(_maxCorrHistory));
 }
 
-void Demodulator::setFrequencyLock(bool lock) {
-    _frequencyLocked = lock;
+void Demodulator::setFrequencyLock(float lockedMarkHz) {
+
+    _frequencyLocked = true;
+
+    make_complex_tone(_demodulatorTone[0], _demodulatorToneN, 
+        _sampleFreq, lockedMarkHz - _symbolSpreadHz, 0.5);
+    make_complex_tone(_demodulatorTone[1], _demodulatorToneN, 
+        _sampleFreq, lockedMarkHz, 0.5);
+
+    _listener->frequencyLocked(lockedMarkHz, lockedMarkHz - _symbolSpreadHz);                    
 }
 
 void Demodulator::reset() {
     _frequencyLocked = false;
-    _inDataSync = false;
-    _frameBitCount = 0;
-    _lastCodeWord12 = 0;
     _edgeRiseSampleCounter = 0;
-    _dataClockRecovery.setLock(false);
-}
-
-int32_t Demodulator::getPLLIntegration() const {
-    return 0;
-}
-
-float Demodulator::getClockRecoveryPhaseError() const {
-    return _dataClockRecovery.getLastPhaseError();
 }
 
 void Demodulator::processSample(q15 sample) {
@@ -121,7 +112,7 @@ void Demodulator::processSample(q15 sample) {
         _lastDCPower = _fftResult[0].mag_f32_squared();
  
         // If we are not yet frequency locked, try to lock
-        if (!_frequencyLocked) {
+        if (!_frequencyLocked && _autoLockEnabled) {
 
             // Find the total power
             float totalPower = 0;
@@ -184,14 +175,8 @@ void Demodulator::processSample(q15 sample) {
 
                     // Convert the bin number to a frequency in Hz
                     float lockedMarkHz = (float)_lockedBinMark * (float)_sampleFreq / (float)_fftN;
-                    float lockedSpaceHz = lockedMarkHz - _symbolSpreadHz;
 
-                    make_complex_tone(_demodulatorTone[0], _demodulatorToneN, 
-                        _sampleFreq, lockedSpaceHz, 0.5);
-                    make_complex_tone(_demodulatorTone[1], _demodulatorToneN, 
-                        _sampleFreq, lockedMarkHz, 0.5);
-
-                    _listener->frequencyLocked(lockedMarkHz, lockedSpaceHz);                    
+                    setFrequencyLock(lockedMarkHz);
                 }
             }
         }
@@ -271,78 +256,12 @@ void Demodulator::processSample(q15 sample) {
 
         _lastCorrDiff = corrDiff;
 
-        // Show the sample to the PLL for clock recovery
-        bool capture = _dataClockRecovery.processSample(_activeSymbol);
-
         // Report out all of the key parameters
-        _listener->sampleMetrics(sample, _activeSymbol, capture, _dataClockRecovery.getLastError(), 
-            _symbolCorr, thresholdCorr, corrDiff);
+        // TODO: NEED TO CLEAN THIS UP
+        _listener->sampleMetrics(sample, _activeSymbol, false, 0, _symbolCorr, thresholdCorr, corrDiff);
 
-        // Process the sample if we are told to do so by the data clock
-        // recovery PLL.
-        if (capture) {
-
-            // Bring in the next bit. 
-            _frameBitAccumulator <<= 1;
-            _frameBitAccumulator |= (_activeSymbol == 1) ? 1 : 0;
-
-            // Look for the synchronization frame by correlated with the magic sequence            
-            const int syncFrameCorr = abs(
-                Frame30::correlate30(_frameBitAccumulator, Frame30::SYNC_FRAME.getRaw())
-            );
-
-            _listener->receivedBit(_activeSymbol == 1, _frameBitCount, syncFrameCorr);
-
-            _frameBitCount++;
-
-            // At all times are are looking for the sync frame, or something very close to it.
-            if (syncFrameCorr > 28) {
-                _inDataSync = true;
-                _frameBitCount = 0;
-                _frameCount++;
-                _lastCodeWord12 = 0;
-                _dataClockRecovery.setLock(true);
-                _listener->dataSyncAcquired();
-            }
-            // Check to see if we have accumulated a complete data frame
-            else if (_frameBitCount == 30) {
-
-                _frameBitCount = 0;
-                _frameCount++;
-
-                if (_inDataSync) {
-                    Frame30 frame(_frameBitAccumulator & Frame30::MASK30LSB);
-
-                    _listener->goodFrameReceived();
-                    CodeWord24 cw24 = frame.toCodeWord24();
-                    CodeWord12 cw12 = cw24.toCodeWord12();
-
-                    if (!cw12.isValid()) {
-                        _listener->badFrameReceived(frame.getRaw());
-                    } 
-                    else {
-                        // Per SCAMP specification: "If the receiver decodes the same code multiple
-                        // times before receiving a different code, it should discard the redundant
-                        // decodes of the code word."
-                        if (cw12.getRaw() == _lastCodeWord12) {                        
-                            _listener->discardedDuplicate();
-                        }
-                        else {
-                            Symbol6 sym0 = cw12.getSymbol0();
-                            Symbol6 sym1 = cw12.getSymbol1();
-                            if (sym0.getRaw() != 0) {
-                                _listener->received(sym0.toAscii());
-                            }
-                            if (sym1.getRaw() != 0) {
-                                _listener->received(sym1.toAscii());
-                            }
-                        }
-                    }
-
-                    _lastCodeWord12 = cw12.getRaw();
-                }
-            }
-        }
+        // Hand off a demodulated symbol to the decoder
+        _processSymbol(_activeSymbol);
     }
 }
 

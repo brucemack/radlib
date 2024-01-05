@@ -46,7 +46,7 @@ public:
     /**
      * Call this depending on the mode being used.
      */
-    void setSymbolSpread(uint16_t spreadHz) { _symbolSpreadHz = spreadHz; };
+    void setSymbolSpread(float spreadHz) { _symbolSpreadHz = spreadHz; };
 
     /**
      * Call this function at the rate defined by sampleFreq and pass the latest
@@ -58,20 +58,23 @@ public:
      * Call this function to clear the frequency lock and the data 
      * synchronization.
     */
-    void reset();
+    virtual void reset();
 
-    void setFrequencyLock(bool lock);
+    void setFrequencyLock(float markFreqHz);
 
     bool isFrequencyLocked() const { return _frequencyLocked; }
-    uint16_t getFrameCount() const { return _frameCount; };
     int32_t getPLLIntegration() const;
-    float getClockRecoveryPhaseError() const;
     float getLastDCPower() const { return _lastDCPower; };
     uint16_t getMarkFreq() const;
 
-private: 
+protected:
+
+    virtual void _processSymbol(uint8_t symbol) = 0;
 
     DemodulatorListener* _listener;
+
+private: 
+
     const uint16_t _sampleFreq;
     const uint16_t _fftN;
     const uint16_t _log2fftN;
@@ -81,9 +84,7 @@ private:
     q15* _fftWindow;
     cq15* _fftResult;
     FixedFFT _fft;
-    //ClockRecoveryPLL _dataClockRecovery;
-    ClockRecoveryDLL _dataClockRecovery;
-
+  
     // FFT is performed every time this number of samples is collected
     const uint16_t _blockSize = 32;
     // This is the approximate symbol rate for SCAMP FSK.  This is used
@@ -99,9 +100,12 @@ private:
     // round down.  We give this a slight haircut to improve robustness.
     const uint16_t _longMarkBlocks = ((_longMarkDuration / _blockDuration) * 0.70);
 
+    // Controls whether auto-lock is enabled
+    bool _autoLockEnabled = true;
+
     // The distance between the two symbols in positive HZ. The
     // default here is relevant to the SCAMP FSK mode.
-    uint16_t _symbolSpreadHz = 67;
+    float _symbolSpreadHz = 66.6666666666;
 
     uint32_t _sampleCount = 0;
 
@@ -128,17 +132,6 @@ private:
     uint16_t _lockedBinMark = 0;
     uint16_t _blockCount = 0;
     uint8_t _activeSymbol = 0;
-
-    // Have we seen the synchronization frame?
-    bool _inDataSync = false;
-    // Here is where we accumulate data bits
-    uint32_t _frameBitAccumulator = 0;
-    // The number of bits received in the frame
-    uint16_t _frameBitCount = 0;
-    // The number of frames received
-    uint16_t _frameCount = 0;
-    // The last code word that was received (used for duplicate detection)
-    uint16_t _lastCodeWord12 = 0;
 
     // These buffers are loaded based on the frequency that the decoder
     // decides to lock onto. The signal is convolved with these tones

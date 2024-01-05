@@ -57,6 +57,7 @@ add_executable(unit-test-7a
   scamp/ClockRecoveryPLL.cpp
   scamp/ClockRecoveryDLL.cpp
   scamp/Demodulator.cpp
+  scamp/SCAMPDemodulator.cpp
   util/FileModulator.cpp 
   util/fixed_math.cpp 
   util/fixed_fft.cpp 

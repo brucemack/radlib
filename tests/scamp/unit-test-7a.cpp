@@ -25,7 +25,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "../../scamp/Symbol6.h"
 #include "../../scamp/CodeWord24.h"
 #include "../../scamp/Frame30.h"
-#include "../../scamp/Demodulator.h"
+#include "../../scamp/SCAMPDemodulator.h"
 
 #include "../../util/fixed_math.h"
 #include "../../util/FSKModulator.h"
@@ -161,7 +161,7 @@ int main(int, const char**) {
         q15 buffer[fftN];
         cq15 fftResult[fftN];
 
-        Demodulator demod(sampleFreq, lowFreq, log2fftN,
+        SCAMPDemodulator demod(sampleFreq, lowFreq, log2fftN,
             trigTable, window, fftResult, buffer);
         demod.setListener(&testListener);
 
