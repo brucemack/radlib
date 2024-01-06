@@ -135,21 +135,19 @@ int main(int,const char**) {
         const unsigned int sampleSize = 2000 * 8;
         static float samples[sampleSize];
         // This is 45.45 baud
-        uint32_t symbolUs = 22002;
-        float markFreq = 2125;
-        float spaceFreq = 2295;
+        const uint32_t symbolUs = 22002;
+        // The marks and spaces are shifted down into a lower frequency 
+        const float markFreq = 2125 - 1500;
+        const float spaceFreq = 2295 - 1500;
+        const char* testMessage1 = "DE KC1FSZ, GOOD MORNING";
 
         // This is the modem used for the demonstration.  Samples are written to a 
         // memory buffer. 
-        TestModem2 modem2(samples, sampleSize, sampleFreq, markFreq, spaceFreq, 0.3, 0.0, 0.0);
-
-        // This is a modem that is used to capture the data for printing.
-        //int8_t printSamples[34 * 30];
-        //TestModem printModem(printSamples, sizeof(printSamples), 1);
-
-        const char* testMessage1 = "DE KC1FSZ, GOOD MORNING";
+        // Notice that we are including a DC offset and some noise.
+        TestModem2 modem2(samples, sampleSize, sampleFreq, markFreq, spaceFreq, 0.3, 0.1, 0.2);
+        // Send the test message.  This populates the sample buffer with signal data
         transmitBaudot(testMessage1, modem2, symbolUs);
-        // Make sure we didn't overflow
+        // Make sure we didn't overflow the sample buffer
         assert(modem2.getSamplesUsed() < sampleSize);
 
         TestDemodulatorListener testListener(cout, 0, 2);
@@ -166,7 +164,6 @@ int main(int,const char**) {
         // Manually lock the spread receive frequencies
         // The spread is negative for RTTY
         float spread = markFreq - spaceFreq;
-        cout << "Spread " << spread << endl;
         demod.setSymbolSpread(spread);
         demod.setFrequencyLock(markFreq);
 
