@@ -41,7 +41,7 @@ public:
         q15* fftTrigTableSpace, q15* fftWindowSpace, cq15* fftResultSpace, 
         q15* bufferSpace);
 
-    void setListener(DemodulatorListener* listener) { _listener = listener; };
+    virtual void setListener(DemodulatorListener* listener) { _listener = listener; };
 
     /**
      * Call this depending on the mode being used.  IMPORTANT: You need
@@ -71,7 +71,8 @@ public:
 
     void setAutoLockEnabled(bool en) { _autoLockEnabled = en; }
 
-    int32_t getPLLIntegration() const;
+    //int32_t getPLLIntegration() const;
+
     float getLastDCPower() const { return _lastDCPower; };
 
     float getMarkFreq() const;

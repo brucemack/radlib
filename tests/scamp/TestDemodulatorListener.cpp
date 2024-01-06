@@ -38,8 +38,7 @@ void TestDemodulatorListener::dataSyncAcquired() {
     _out << "Data Sync Acquired" << endl;
 }
 
-void TestDemodulatorListener::frequencyLocked(uint16_t markFreq, 
-    uint16_t spaceFreq) {
+void TestDemodulatorListener::frequencyLocked(uint16_t markFreq, uint16_t spaceFreq) {
     _out << "Frequency locked at mark=" << markFreq << ", space=" << spaceFreq << endl;
     // Check to see if we should trigger
     if (_triggerMode == ON_LOCK) {

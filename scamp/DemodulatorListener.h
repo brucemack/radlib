@@ -18,13 +18,14 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <cstdint>
 #include "../util/fixed_math.h"
+#include "../util/DataListener.h"
 
 namespace radlib {
 
 /**
  * An abstract interface used to receive status/events from the demodulator
  */
-class DemodulatorListener {
+class DemodulatorListener : public DataListener {
 public:
 
     virtual void dataSyncAcquired() { }
@@ -32,6 +33,7 @@ public:
     virtual void frequencyLocked(uint16_t markFreq, uint16_t spaceFreq) { }
     virtual void goodFrameReceived() { }
     virtual void badFrameReceived(uint32_t rawFrame) { }
+    // NOTE: This comes from the DataListener interface!
     virtual void received(char asciiChar) { }
     virtual void bitTransitionDetected() { }
     virtual void receivedBit(bool bit, uint16_t frameBitPos, int syncFrameCorr) { }

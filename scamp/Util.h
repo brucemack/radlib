@@ -18,8 +18,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #define _Util_h
 
 #include <iostream>
-#include <functional>
 #include <cinttypes>
+#include <functional>
 
 #include "Frame30.h"
 #include "../util/fixed_math.h"
@@ -37,43 +37,6 @@ void makePairs(const char* in, std::function<void(char a, char b)> cb);
 */
 unsigned int encodeString(const char* in, Frame30* outList, unsigned int outListSize, 
     bool includeSyncFrame);
-
-void visitTone(const unsigned int len, uint16_t sample_freq_hz, uint16_t tone_freq_hz,
-    float amplitude, uint16_t phaseDegrees, std::function<void(uint16_t idx, float y)> cb);
-
-void make_real_tone(q15* output, const unsigned int len, 
-    float sample_freq_hz, float tone_freq_hz, 
-    float amplitude, float phaseDegrees = 0);
-
-void make_real_tone_distorted(q15* output, const unsigned int len, 
-    float sample_freq_hz, float tone_freq_hz, 
-    float amplitude, float phaseDegrees, float dcOffset);
-
-void addTone(q15* output, 
-    const unsigned int len, float sample_freq_hz, 
-    float tone_freq_hz, float amplitude, float phaseDegrees = 0);
-
-void make_complex_tone(cq15* output, unsigned int len, 
-    float sample_freq_hz, float tone_freq_hz, 
-    float amplitude, float phaseDegrees = 0);
-
-float complex_corr(cq15* c0, cq15* c1, uint16_t len);
-
-float corr_real_complex(const q15* c0, const cq15* c1, uint16_t len);
-
-/**
- * This is a convolution function that supports a circular buffer
- * for the c0 (real) series and a linear buffer for the c1 (complex)
- * series. This would typically be used to convolve input samples
- * from an ADC with the complex coefficients of an FIR or quadrature
- * demodulator.
- * 
- * Automatic wrapping on the c0 buffer is used to avoid going off the end.
- */
-//float corr_real_complex_2(const q15* c0, uint16_t c0Base, uint16_t c0Size, 
-//    const cq15* c1, uint16_t c1Len);
-
-//float pi();
 
 void make_bar(std::ostream& str, unsigned int len);
 
