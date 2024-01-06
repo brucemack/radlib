@@ -18,7 +18,6 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstring>
 
 #include "../util/dsp_util.h"
-#include "Util.h"
 #include "Demodulator.h"
 
 using namespace std;

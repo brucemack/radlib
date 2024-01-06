@@ -20,7 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <sstream>
 
 #include "../../util/fixed_math.h"
-#include "../../scamp/DemodulatorListener.h"
+#include "../../util/DemodulatorListener.h"
 
 namespace radlib {
 

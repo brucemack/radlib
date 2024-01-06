@@ -20,10 +20,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "../util/fixed_math.h"
 #include "../util/fixed_fft.h"
-#include "DemodulatorListener.h"
+#include "../util/Demodulator.h"
+#include "../util/DemodulatorListener.h"
 #include "ClockRecoveryPLL.h"
 #include "ClockRecoveryDLL.h"
-#include "Demodulator.h"
 
 namespace radlib {
 

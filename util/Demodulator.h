@@ -21,15 +21,13 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "../util/fixed_math.h"
 #include "../util/fixed_fft.h"
 #include "DemodulatorListener.h"
-#include "ClockRecoveryPLL.h"
-#include "ClockRecoveryDLL.h"
 
 #define SYMBOL_COUNT (2)
 
 namespace radlib {
 
 /**
- * This contains all of the SCAMP demodulator logic.  This is a stateful
+ * This contains all of the FSK demodulator logic.  This is a stateful
  * object that will be called once every sample interval with the latest
  * available sample.
  */

@@ -20,8 +20,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "../util/fixed_math.h"
 #include "../util/fixed_fft.h"
-#include "../scamp/DemodulatorListener.h"
-#include "../scamp/Demodulator.h"
+#include "../util/DemodulatorListener.h"
+#include "../util/Demodulator.h"
 #include "BaudotDecoder.h"
 
 namespace radlib {

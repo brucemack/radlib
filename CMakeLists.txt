@@ -13,7 +13,7 @@ add_executable(unit-test-1
   rtty/BaudotDecoder.cpp 
   rtty/BaudotEncoder.cpp 
   rtty/RTTYDemodulator.cpp 
-  scamp/Demodulator.cpp 
+  util/Demodulator.cpp 
   util/fixed_math.cpp 
   util/fixed_fft.cpp 
   util/dsp_util.cpp 
@@ -44,7 +44,7 @@ add_executable(unit-test-4
   scamp/Util.cpp 
   scamp/ClockRecoveryPLL.cpp
   scamp/ClockRecoveryDLL.cpp
-  scamp/Demodulator.cpp
+  util/Demodulator.cpp
   util/FileModulator.cpp 
   util/fixed_math.cpp 
   util/fixed_fft.cpp 
@@ -63,7 +63,7 @@ add_executable(unit-test-7a
   scamp/Util.cpp 
   scamp/ClockRecoveryPLL.cpp
   scamp/ClockRecoveryDLL.cpp
-  scamp/Demodulator.cpp
+  util/Demodulator.cpp
   scamp/SCAMPDemodulator.cpp
   util/FileModulator.cpp 
   util/fixed_math.cpp 
