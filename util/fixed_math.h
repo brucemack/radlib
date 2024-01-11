@@ -88,20 +88,9 @@ uint16_t max_idx_2(const cq15* sample, uint16_t start, uint16_t len);
 
 q15 max_q15(const q15* data, uint16_t dataLen);
 q15 min_q15(const q15* data, uint16_t dataLen);
-// NOTE: This will only work for data lengths that are a power of two!
-q15 mean_q15(const q15* data, uint16_t log2DataLen);
 
-/**
- * This is a convolution function that supports a circular buffer
- * for the c0 (real) series and a linear buffer for the c1 (complex)
- * series. This would typically be used to convolve input samples
- * from an ADC with the complex coefficients of an FIR or quadrature
- * demodulator.
- * 
- * Automatic wrapping on the c0 buffer is used to avoid going off the end.
- */
-float corr_real_complex_2(const q15* c0, uint16_t c0Base, uint16_t c0Size, 
-    const cq15* c1, uint16_t c1Len);
+// NOTE: This will only work for data lengths that are a power of two!
+q15 mean_q15(const q15* data, uint16_t dataLenLog2);
 
 }
 

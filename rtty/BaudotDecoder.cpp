@@ -68,19 +68,25 @@ BaudotDecoder::BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100,
 :   _samplesPerSymbol((100 * sampleRate) / baudRateTimes100),
     _mode(BaudotMode::LTRS),
     _avg(windowSizeLog2, windowArea),
-    _lastSymbol(0),
-    _state(0),
+    // In the initial state we are waiting to see a mark that can be used
+    // as the basis for the start bit.
+    _state(5),
     _sampleCount(0),
+    _totalSampleCount(0),
+    _invalidSampleCount(0),
     _symbolCount(0),
     _symbolAcc(0) {
 }
 
 void BaudotDecoder::reset() {
     _mode = BaudotMode::LTRS;
-    _state = 0;
+    // In the initial state we are waiting to see a mark that can be used
+    // as the basis for the start bit.
+    _state = 5;
     _avg.reset();
-    _lastSymbol = 0;
     _sampleCount = 0;
+    _totalSampleCount = 0;
+    _invalidSampleCount = 0;
     _symbolCount = 0;
     _symbolAcc = 0;
 }
@@ -89,22 +95,50 @@ void BaudotDecoder::reset() {
  * Symbol 1 = Mark (High)
  * Symbol 0 = Space (Low)
 */
-void BaudotDecoder::processSample(uint8_t symbol) {
+void BaudotDecoder::processSample(bool isSymbolValid, uint8_t symbol) {
 
     _sampleCount++;
+    _totalSampleCount++;
+
+    if (!isSymbolValid) {
+        _invalidSampleCount++;
+    }
+
+    const int16_t markVal = 32767;
+    const int16_t spaceVal = -32767;
+    const int16_t markThreshold = markVal >> 1;
+    const int16_t spaceThreshold = spaceVal >> 1;
 
     // A windowed average is used to clean any noise out of the 
     // symbol transitions.
-    int16_t rawSymbolQ15 = (symbol == 1) ? 32767 : -32767;
-    int16_t smoothedSymbol = _avg.sample(rawSymbolQ15) >= 0 ? 1 : -1;
+    int16_t rawSymbolQ15;
+    if (isSymbolValid)  {
+        rawSymbolQ15 = (symbol == 1) ? markVal : spaceVal;
+    } else {
+        rawSymbolQ15 = 0;
+    }
+
+    int16_t avgSymbol = _avg.sample(rawSymbolQ15);
+    int16_t smoothedSymbol;
+
+    if (avgSymbol > markThreshold) {
+        smoothedSymbol = 1;
+    } else if (avgSymbol < spaceThreshold) {
+        smoothedSymbol = -1;
+    } else {
+        smoothedSymbol = 0;
+    }
 
     // Watching for start bit
     if (_state == 0) {
-        if (_lastSymbol == 1 && smoothedSymbol == -1) {
+        // Trigger on the down transition
+        if (smoothedSymbol == -1) {
             _state = 1;
             _sampleCount = 0;
+            //cout << "Start at " << _totalSampleCount << " " << (float)_totalSampleCount / 330.0 << " " << _invalidSampleCount << endl;
         }
     }
+    // Waiting through the start bit
     else if (_state == 1) {
         if (_sampleCount == _samplesPerSymbol) {
             _state = 2;
@@ -113,9 +147,11 @@ void BaudotDecoder::processSample(uint8_t symbol) {
             _symbolAcc = 0;
         }
     }
+    // Inside the beginning of a data bit
     else if (_state == 2) {
         // Wait for the middle of the symbol
         if (_sampleCount >= (_samplesPerSymbol >> 1)) {
+            //cout << "  Capture " << smoothedSymbol << " " << avgSymbol << " " << " " << (float)_totalSampleCount / 330.0 << endl;
             // Shift in a new symbol
             _symbolAcc <<= 1;
             if (smoothedSymbol == 1) {
@@ -126,7 +162,7 @@ void BaudotDecoder::processSample(uint8_t symbol) {
             _state = 3;
         }
     }
-    // This is the state where we wait through the data bit
+    // This is the state where we wait through the second part of the data bit
     else if (_state == 3) {
         if (_sampleCount >= _samplesPerSymbol) {
             _sampleCount = 0;
@@ -157,15 +193,21 @@ void BaudotDecoder::processSample(uint8_t symbol) {
             }
         }
     }
-    // This is the stop bit state
+    // This is the stop bit state.  Technically we want to wait 1.5 bits, but we
+    // are only waiting 1.0 bit.
     else if (_state == 4) {
         if (_sampleCount >= _samplesPerSymbol) {
+            _sampleCount = 0;
+            _state = 5;
+        }
+    }
+    // This is the state where we are waiting to see us go back to mark
+    else if (_state == 5) {
+        if (smoothedSymbol == 1) {
             _sampleCount = 0;
             _state = 0;
         }
     }
-
-    _lastSymbol = smoothedSymbol;
 }
 
 }

@@ -40,6 +40,7 @@ public:
 
     void received(char asciiChar) {
         _str << asciiChar;
+        //cout << "============== GOT: " << asciiChar << endl;
     }
 
     string get() {
@@ -55,7 +56,7 @@ private:
 
 static void run(BaudotDecoder& dec, uint8_t symbol, uint16_t copies) {
     for (uint16_t i = 0; i < copies; i++) {
-        dec.processSample(symbol);
+        dec.processSample(true, symbol);
     }
 }
 
@@ -66,9 +67,9 @@ int main(int,const char**) {
         transmitBaudot("CQCQ DE KC1FSZ", mod, symbolUs);
         cout << endl;
 
-        int16_t windowArea[4];
+        int16_t windowArea[8];
         Listener l;
-        BaudotDecoder dec(2000, 4545, 2, windowArea);
+        BaudotDecoder dec(2000, 4545, 3, windowArea);
         dec.setDataListener(&l);
 
         // Idle
@@ -120,7 +121,7 @@ int main(int,const char**) {
 
         // Play all of the samples into the decoder
         for (uint32_t i = 0; i < mod2.getSamplesUsed(); i++) {
-            dec.processSample(sampleData[i]);
+            dec.processSample(true, sampleData[i]);
         }
         assert(l.get() == msg);
     }
@@ -144,7 +145,7 @@ int main(int,const char**) {
         // This is the modem used for the demonstration.  Samples are written to a 
         // memory buffer. 
         // Notice that we are including a DC offset and some noise.
-        TestModem2 modem2(samples, sampleSize, sampleFreq, markFreq, spaceFreq, 0.3, 0.1, 0.2);
+        TestModem2 modem2(samples, sampleSize, sampleFreq, markFreq, spaceFreq, 0.5, 0.1, 0.2);
         // Send the test message.  This populates the sample buffer with signal data
         transmitBaudot(testMessage1, modem2, symbolUs);
         // Make sure we didn't overflow the sample buffer
@@ -166,6 +167,8 @@ int main(int,const char**) {
         float spread = markFreq - spaceFreq;
         demod.setSymbolSpread(spread);
         demod.setFrequencyLock(markFreq);
+        // Set detection threshold
+        demod.setDetectionCorrelationThreshold(1.0);
 
         // Walk through the data one byte at a time.  We do something extra
         // each time we have processed a complete block.
@@ -178,6 +181,7 @@ int main(int,const char**) {
         cout << "LAST DC : " << demod.getLastDCPower() << endl;
         cout << "MARK HZ : " << demod.getMarkFreq() << endl;
         cout << "MESSAGE : " << testListener.getMessage() << endl;
+        cout << "INVALID SAMPLE RATIO: " << (float)demod.getInvalidSampleCount() / (float)demod.getSampleCount() << endl;
     }
 }
 

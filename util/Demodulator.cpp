@@ -24,6 +24,60 @@ using namespace std;
 
 namespace radlib {
 
+// LPF with cut-off at 33 Hz, transition 200 Hz, Blackman window.  Coefficients = 47.
+// Built from: https://fiiir.com/
+//
+static const uint16_t h_lpf_33_size = 47;
+static const float h_lpf_33[] = {
+    0.000000000000000000,
+    0.000031950343187103,
+    0.000147936959029139,
+    0.000384359636563844,
+    0.000787003634738626,
+    0.001411141838523909,
+    0.002319784160773662,
+    0.003579944811985529,
+    0.005257067022493679,
+    0.007408017440172351,
+    0.010073303620179160,
+    0.013269345114754810,
+    0.016981715668375547,
+    0.021160255073868633,
+    0.025716820932183259,
+    0.030526222709496793,
+    0.035430575357155471,
+    0.040246959675527820,
+    0.044777920302203671,
+    0.048824010340036958,
+    0.052197341954698558,
+    0.054734955050421391,
+    0.056310790486405832,
+    0.056845155734448642,
+    0.056310790486405839,
+    0.054734955050421391,
+    0.052197341954698551,
+    0.048824010340036979,
+    0.044777920302203678,
+    0.040246959675527820,
+    0.035430575357155471,
+    0.030526222709496811,
+    0.025716820932183266,
+    0.021160255073868626,
+    0.016981715668375537,
+    0.013269345114754815,
+    0.010073303620179167,
+    0.007408017440172354,
+    0.005257067022493686,
+    0.003579944811985531,
+    0.002319784160773660,
+    0.001411141838523911,
+    0.000787003634738626,
+    0.000384359636563845,
+    0.000147936959029139,
+    0.000031950343187103,
+    0.000000000000000000,
+};
+
 Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2fftN,
     q15* fftTrigTable, q15* fftWindow,
     cq15* fftResultSpace, q15* bufferSpace)
@@ -47,7 +101,15 @@ Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2
     memset((void*)_buffer, 0, _fftN);
     memset((void*)_maxBinHistory, 0, sizeof(_maxBinHistory));
     memset((void*)_demodulatorTone, 0, sizeof(_demodulatorTone));
-    memset((void*)_maxCorrHistory, 0, sizeof(_maxCorrHistory));
+
+    _clearCorrelationHistory();
+}
+
+void Demodulator::_clearCorrelationHistory() {
+    for (uint16_t s = 0; s < _symbolCount; s++)
+       for (uint16_t i = 0; i < _symbolCorrN; i++)
+            _symbolCorr[s][i] = 0;
+    _symbolCorrPtr = 0;
 }
 
 void Demodulator::setFrequencyLock(float lockedMarkHz) {
@@ -55,9 +117,10 @@ void Demodulator::setFrequencyLock(float lockedMarkHz) {
     _frequencyLocked = true;
     _lockedMarkFreq = lockedMarkHz;
 
-    make_complex_tone(_demodulatorTone[0], _demodulatorToneN, 
+    // NOTE: These tones are scaled by 0.5 to avoid overflow issues
+    make_complex_tone_cq15(_demodulatorTone[0], _demodulatorToneN, 
         _sampleFreq, lockedMarkHz - _symbolSpreadHz, 0.5);
-    make_complex_tone(_demodulatorTone[1], _demodulatorToneN, 
+    make_complex_tone_cq15(_demodulatorTone[1], _demodulatorToneN, 
         _sampleFreq, lockedMarkHz, 0.5);
 
     _listener->frequencyLocked(lockedMarkHz, lockedMarkHz - _symbolSpreadHz);                    
@@ -65,7 +128,7 @@ void Demodulator::setFrequencyLock(float lockedMarkHz) {
 
 void Demodulator::reset() {
     _frequencyLocked = false;
-    _edgeRiseSampleCounter = 0;
+    _clearCorrelationHistory();
 }
 
 void Demodulator::processSample(q15 sample) {
@@ -94,8 +157,7 @@ void Demodulator::processSample(q15 sample) {
                     _buffer[wrapIndex(readBufferPtr, i, _fftN)] - avg, 
                     _fftWindow[i]
                 );
-            } 
-            else {
+            } else {
                 _fftResult[i].r = _buffer[wrapIndex(readBufferPtr, i, _fftN)] - avg;
             }
             _fftResult[i].i = 0;
@@ -196,68 +258,73 @@ void Demodulator::processSample(q15 sample) {
             demodulatorStart = _fftN - gap;
         }
 
-        // Correlate recent history with each of the symbol tones templates
-        float maxCorr = 0;
+        // ----- Matched Filter Implementation --------------------------------
+        //
+        // Correlate recent history with each of the symbol models to look 
+        // for matches.
+        float filteredSymbolCorr[_symbolCount];
+        
         for (uint16_t s = 0; s < _symbolCount; s++) {
+
+            // Correlate the received data with the model symbol.
             // Here we have automatic wrapping in the _buffer space, so don't
             // worry if demodulatorStart is close to the end.
-            _symbolCorr[s] = corr_real_complex_2(_buffer, demodulatorStart, _fftN, 
-                _demodulatorTone[s], _demodulatorToneN);
-            maxCorr = std::max(maxCorr, _symbolCorr[s]);
+            _symbolCorr[s][_symbolCorrPtr] = corr_q15_cq15_2(_buffer, demodulatorStart, _fftN, 
+                _demodulatorTone[s], _demodulatorToneN);            
+
+            // Apply a low-pass filter to the recent history of the correlations
+            // so that we can properly identify the transitions.  The cut-off of this
+            // filter is determined by the baud rate of the data being recovered.
+            uint16_t corrPtr = _symbolCorrPtr;
+            float conv = 0;
+            for (uint16_t i = 0; i < h_lpf_33_size; i++) {
+                // Multiply-accumulate
+                conv += _symbolCorr[s][corrPtr] * h_lpf_33[i];
+                // Track backwards through the recent correlations, wrapping as needed
+                if (corrPtr == 0) {
+                    corrPtr = _symbolCorrN - 1;
+                } else {
+                    corrPtr--;
+                }
+            }
+            filteredSymbolCorr[s] = conv;
         }
 
-        // Here we track the recent history of the maximum correlation
-        _maxCorrHistory[_maxCorrHistoryPtr] = maxCorr;
-        _maxCorrHistoryPtr = incAndWrap(_maxCorrHistoryPtr, _maxCorrHistoryN);
-    
-        // Figure out the current threshold by averaging 
-        float thresholdCorr = 0;
-        for (uint16_t i = 0; i < _maxCorrHistoryN; i++) {
-            thresholdCorr += _maxCorrHistory[i];
+        // Keep rotating through history of correlations, wrapping as needed
+        if (++_symbolCorrPtr == _symbolCorrN) {
+            _symbolCorrPtr = 0;
         }
-        // The correlation diff must reach 33% of the recent maximum correlation 
-        // to be considered a transition.
-        thresholdCorr /= (3.0 * (float)_maxCorrHistoryN);
 
-        // The difference is adjusted so that a transition is always an increasing
-        // difference.
+        // The difference is adjusted so that a symbol transition is always an 
+        // increasing difference in correlations.
         float corrDiff;
         if (_activeSymbol == 0) {
-            corrDiff = _symbolCorr[1] - _symbolCorr[0];
+            corrDiff = filteredSymbolCorr[1] - filteredSymbolCorr[0];
         } else {
-            corrDiff = _symbolCorr[0] - _symbolCorr[1];
+            corrDiff = filteredSymbolCorr[0] - filteredSymbolCorr[1];
         }
 
-        // Look for an inflection point in the respective correlations 
-        // of the symbols.  
-        if (corrDiff > thresholdCorr) {
-            // If we are still increasing then let it keep going up before 
-            // declaring an edge transition
-            if (corrDiff > _lastCorrDiff && 
-                _edgeRiseSampleCounter < _edgeRiseSampleLimit) {
-                _edgeRiseSampleCounter++;
+        // Once we cross 0 we have detected a transition
+        if (corrDiff > 0) {
+            // Reverse the active symbol
+            if (_activeSymbol == 0) {
+                _activeSymbol = 1;
+            } else {
+                _activeSymbol = 0;
             }
-            else {
-                // Reverse the active symbol
-                if (_activeSymbol == 0) {
-                    _activeSymbol = 1;
-                }
-                else {
-                    _activeSymbol = 0;
-                }
-                _edgeRiseSampleCounter = 0;
-                _listener->bitTransitionDetected();
-            }
+            _listener->bitTransitionDetected();
         }
+
+        bool aboveCorrelationThreshold = 
+            filteredSymbolCorr[_activeSymbol] > _detectionCorrelationThreshold;
 
         _lastCorrDiff = corrDiff;
 
         // Report out all of the key parameters
-        // TODO: NEED TO CLEAN THIS UP
-        _listener->sampleMetrics(sample, _activeSymbol, false, 0, _symbolCorr, thresholdCorr, corrDiff);
+        _listener->sampleMetrics(sample, _activeSymbol, filteredSymbolCorr, aboveCorrelationThreshold);
 
         // Hand off a demodulated symbol to the decoder
-        _processSymbol(_activeSymbol);
+        _processSymbol(aboveCorrelationThreshold, _activeSymbol);
     }
 }
 

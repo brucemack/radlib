@@ -38,8 +38,8 @@ void RTTYDemodulator::reset() {
     _decoder.reset();
 }
 
-void RTTYDemodulator::_processSymbol(uint8_t symbol) {    
-    _decoder.processSample(symbol);
+void RTTYDemodulator::_processSymbol(bool isSymbolValid, uint8_t symbol) {    
+    _decoder.processSample(isSymbolValid, symbol);
 }
 
 }

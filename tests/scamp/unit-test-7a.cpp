@@ -52,7 +52,9 @@ const unsigned int spaceFreq = 600;
 // Here we can inject a tuning error to show that the demodulator will
 // still find the signal.
 const unsigned int tuningErrorHz = 0;
-const unsigned int S = 2 * 34 * 30 * samplesPerSymbol;
+
+// Reserve space for modulation
+const unsigned int S = ((30 * 30) + 30) * samplesPerSymbol;
 static float samples[S];
 
 // The size of the FFT used for frequency acquisition
@@ -99,6 +101,7 @@ int main(int, const char**) {
         Frame30 frames[32];
 
         unsigned int frameCount1 = encodeString(testMessage1, frames, 45, true);
+        cout << "Used frames " << frameCount1 << endl;
         assertm(frameCount1 < 32, "FRAME COUNT");
     
         // This silence is 30 symbols, or 30 * 60 = 1800 samples long
@@ -120,6 +123,7 @@ int main(int, const char**) {
         }
 
         unsigned int frameCount2 = encodeString(testMessage2, frames, 45, true);
+        cout << "Used frames " << frameCount2 << endl;
         assertm(frameCount2 < 32, "FRAME COUNT");
 
         for (unsigned int i = 0; i < frameCount2; i++) {

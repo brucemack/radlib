@@ -77,7 +77,10 @@ public:
      * Symbol 1 = Mark (High)
      * Symbol 0 = Space (Low)
      */
-    void processSample(uint8_t symbol);
+    void processSample(bool isSymbolValid, uint8_t symbol);
+
+    uint32_t getSampleCount() const { return _totalSampleCount; }
+    uint32_t getInvalidSampleCount() const { return _invalidSampleCount; }
 
 private:    
 
@@ -89,9 +92,10 @@ private:
 
     BaudotMode _mode = BaudotMode::LTRS;
     WindowAverage _avg;
-    int16_t _lastSymbol;
     uint16_t _state;
-    uint16_t _sampleCount;
+    uint32_t _sampleCount;
+    uint32_t _totalSampleCount;
+    uint32_t _invalidSampleCount;
     uint8_t _symbolCount;
     uint8_t _symbolAcc;
 };

@@ -40,8 +40,7 @@ public:
         uint8_t capture;
         int32_t pllError;
         float symbolCorr[2];
-        float corrThreshold;
-        float corrDiff;
+        bool isAnySymbolPresent;
     };
 
     enum TriggerMode { NONE, MANUAL, ON_LOCK };
@@ -55,9 +54,7 @@ public:
     virtual void badFrameReceived(uint32_t rawFrame);
     virtual void goodFrameReceived();
     virtual void received(char asciiChar);
-    virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, bool capture, 
-        int32_t pllError,
-        float* symbolCorr, float corrThreshold, float corrDiff);
+    virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, float* symbolCorr, bool isAnySymbolPresent);
     virtual void bitTransitionDetected();
     virtual void receivedBit(bool bit, uint16_t frameBitPos, int syncFrameCorr);
 
@@ -81,6 +78,7 @@ private:
     TriggerMode _triggerMode = NONE;
     uint16_t _triggerDelay = 0;
     uint16_t _delayCounter = 0;
+    float _recentCorrDiff = 0;
 };
 
 }

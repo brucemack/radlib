@@ -108,32 +108,4 @@ q15 mean_q15(const q15* data, uint16_t log2DataLen) {
     return (uint16_t)(total >> log2DataLen);
 }
 
-// TODO: CLEAN THIS UP FOR EFFICIENCY
-float corr_real_complex_2(const q15* c0, uint16_t c0Base, uint16_t c0Size,
-    const cq15* c1, uint16_t c1Len) {
-
-    float result_r = 0;
-    float result_i = 0;
-
-    for (uint16_t i = 0; i < c1Len; i++) {
-        // Real value
-        float a = q15_to_f32(c0[wrapIndex(c0Base, i, c0Size)]);
-        // Real value
-        float c = q15_to_f32(c1[i].r);
-        // Complex conjugate value
-        float d = -q15_to_f32(c1[i].i);
-        result_r += (a * c);
-        result_i += (a * d);
-    }
-    
-    //return std::sqrt(result_r * result_r + result_i * result_i);
-
-    // We are using an approximation of the square/square root magnitude
-    // calculator here:
-    float abs_result_r = std::abs(result_r);
-    float abs_result_i = std::abs(result_i);
-    return std::max(abs_result_r, abs_result_i) + 
-           std::floor((abs_result_r + abs_result_i) / 2.0);
-}
-
 }

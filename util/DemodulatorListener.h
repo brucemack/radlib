@@ -36,14 +36,14 @@ public:
     // NOTE: This comes from the DataListener interface!
     virtual void received(char asciiChar) { }
     virtual void bitTransitionDetected() { }
+    virtual void isSymbolPresent(bool e) { }
     virtual void receivedBit(bool bit, uint16_t frameBitPos, int syncFrameCorr) { }
 
     /**
-     * The key data used to identify symbols.
+     * The key data used to identify symbols.  
+     * NOTE: This is called on every sample so be ready for a lot of data.
      */
-    virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, bool capture, 
-        int32_t lastPLLError,
-        float* symbolCorr, float corrThreshold, float corrDiff) { }
+    virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, float* symbolCorr, bool isAnySymbolPresent) { }
 
     /**
      * Called when the receiver discards a duplicate codeword

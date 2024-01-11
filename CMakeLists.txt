@@ -20,6 +20,16 @@ add_executable(unit-test-1
   util/WindowAverage.cpp 
 )
 
+add_executable(util-test-1
+  tests/util/util-test-1.cpp
+  util/fixed_math.cpp 
+  util/fixed_fft.cpp 
+  util/dsp_util.cpp 
+  util/f32_fft.cpp 
+  util/WindowAverage.cpp 
+)
+
+
 add_executable(unit-test-2
   tests/unit-test-2.cpp
   util/WindowAverage.cpp 

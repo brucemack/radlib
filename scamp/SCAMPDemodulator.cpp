@@ -50,7 +50,7 @@ float SCAMPDemodulator::getClockRecoveryPhaseError() const {
     return _dataClockRecovery.getLastPhaseError();
 }
 
-void SCAMPDemodulator::_processSymbol(uint8_t activeSymbol) {
+void SCAMPDemodulator::_processSymbol(bool isSymbolValid, uint8_t activeSymbol) {
 
     // Show the sample to the PLL for clock recovery
     bool capture = _dataClockRecovery.processSample(activeSymbol);

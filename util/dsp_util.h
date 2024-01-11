@@ -12,13 +12,43 @@ namespace radlib {
 float pi();
 
 /**
+ * Floating-point complex number
+*/
+struct cf32 {
+
+    float r = 0;
+    float i = 0;
+
+    float mag() const {
+        return std::sqrt(r * r + i * i);
+    }
+    float magSquared() const {
+        return r * r + i * i;
+    }
+};
+
+/**
  * Adds on to the index and wraps back to zero if necessary.
 */
 uint16_t incAndWrap(uint16_t index, uint16_t size);
 
 float complex_corr(cq15* c0, cq15* c1, uint16_t len);
 
-float corr_real_complex(const q15* c0, const cq15* c1, uint16_t len);
+float corr_q15_cq15(const q15* c0, const cq15* c1, uint16_t len);
+
+float corr_f32_cf32(const float* c0, const cf32* c1, uint16_t len);
+
+/**
+ * This is a convolution function that supports a circular buffer
+ * for the c0 (real) series and a linear buffer for the c1 (complex)
+ * series. This would typically be used to convolve input samples
+ * from an ADC with the complex coefficients of an FIR or quadrature
+ * demodulator.
+ * 
+ * Automatic wrapping on the c0 buffer is used to avoid going off the end.
+ */
+float corr_q15_cq15_2(const q15* c0, uint16_t c0Start, uint16_t c0Size, 
+    const cq15* c1, uint16_t c1Size);
 
 /**
  * A utility function for dealing with circular buffers.  Result
@@ -26,12 +56,27 @@ float corr_real_complex(const q15* c0, const cq15* c1, uint16_t len);
 */
 uint16_t wrapIndex(uint16_t base, uint16_t disp, uint16_t size);
 
-void visitTone(const unsigned int len, uint16_t sample_freq_hz, uint16_t tone_freq_hz,
-    float amplitude, uint16_t phaseDegrees, std::function<void(uint16_t idx, float y)> cb);
+/**
+ * Visits points on a real-valued sinusoidal tone.
+ */
+void visit_real_tone(uint32_t len, float sample_freq_hz, float tone_freq_hz,
+    float amplitude, float phaseDegrees, std::function<void(uint16_t idx, float y)> cb);
 
-void make_real_tone(q15* output, const unsigned int len, 
+/**
+ * Fills a buffer with a real sinusoidal signal of the specified amplitude/frequency/
+ * phase.
+ */
+void make_real_tone_f32(float* output, const uint16_t len, 
     float sample_freq_hz, float tone_freq_hz, 
-    float amplitude, float phaseDegrees = 0);
+    float amplitude, float phase_degrees = 0);
+
+/**
+ * Fills a buffer with a real sinusoidal signal of the specified amplitude/frequency/
+ * phase.
+ */
+void make_real_tone_q15(q15* output, const unsigned int len, 
+    float sample_freq_hz, float tone_freq_hz, 
+    float amplitude, float phase_degrees = 0);
 
 void make_real_tone_distorted(q15* output, const unsigned int len, 
     float sample_freq_hz, float tone_freq_hz, 
@@ -41,9 +86,21 @@ void addTone(q15* output,
     const unsigned int len, float sample_freq_hz, 
     float tone_freq_hz, float amplitude, float phaseDegrees = 0);
 
-void make_complex_tone(cq15* output, unsigned int len, 
+void make_complex_tone_cf32(cf32* output, uint16_t len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude, float phaseDegrees = 0);
+
+void make_complex_tone_cq15(cq15* output, unsigned int len, 
+    float sample_freq_hz, float tone_freq_hz, 
+    float amplitude, float phaseDegrees = 0);
+
+/**
+ * An extremely simplistic DFT.  Not usable for performance-critical 
+ * applications!
+ */
+void simpleDFT(cf32* in, cf32* out, uint16_t fftN);
+
+uint16_t maxMagIdx(const cf32* data, uint16_t start, uint16_t dataLen);
 
 }
 

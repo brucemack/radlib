@@ -20,32 +20,32 @@ This borrows heavily from code by Hunter Adams (vha3@cornell.edu),
 Tom Roberts, and Malcolm Slaney (malcolm@interval.com).
 */
 #include <cassert>
-#include "fixed_fft.h"
+
+#include "f32_fft.h"
 
 #define CHK(x,y) (x)
 
 namespace radlib {
 
-FixedFFT::FixedFFT(uint16_t n, q15* trigTable)
+F32FFT::F32FFT(uint16_t n, float* trigTable)
 :   N(n),
     _cosTable(trigTable) {
     for (uint16_t i = 0; i < N; i++) {
-        // NOTE: There is overflow when sin(phi) = 1.0 so we scale down everything by 2.
-        _cosTable[CHK(i, N)] = f32_to_q15(std::sin(TWO_PI * ((float) i) / (float)N) / 2.0f);
+        _cosTable[CHK(i, N)] = (std::sin(TWO_PI * ((float) i) / (float)N));
     }
 }
 
 /**
  * Performs the FFT in-place. Meaning: the input series is overwritten.
  */
-void FixedFFT::transform(cq15 f[]) const {
+void F32FFT::transform(cf32 f[]) const {
 
     // One of the indices being swapped    
     uint16_t m;   
     // The other index being swapped (r for reversed)
     uint16_t mr; 
     // Temporary while swapping
-    q15 tr, ti; 
+    float tr, ti; 
 
     // Indices being combined in Danielson-Lanczos part of the algorithm    
     int16_t i, j; 
@@ -101,23 +101,19 @@ void FixedFFT::transform(cq15 f[]) const {
             // Lookup the trig values for that element
             j = m << k;                
             // cos(2PI m/N) / 2
-            // NOTE: The scale by two was taken care of during the loading of the 
-            // table.
-            const q15 wr = _cosTable[CHK(j + N / 4,N)]; 
+            const float wr = _cosTable[CHK(j + N / 4,N)] / 2.0; 
             // sin(2PI m/N) / 2
-            // NOTE: The scale by two was taken care of during the loading of the 
-            // table.
-            const q15 wi = -_cosTable[CHK(j,N)];                 
+            const float wi = -_cosTable[CHK(j,N)] / 2.0;                 
             // i gets the index of one of the FFT elements being combined
             for (i = m; i < N; i += iStep) {
                 // j gets the index of the FFT element being combined with i
                 j = i + L;
                 // Compute the trig terms (bottom half of the above matrix)
-                tr = mult_q15(wr, f[CHK(j,N)].r) - mult_q15(wi, f[CHK(j,N)].i);
-                ti = mult_q15(wr, f[CHK(j,N)].i) + mult_q15(wi, f[CHK(j,N)].r);
+                tr = wr * f[CHK(j,N)].r - wi * f[CHK(j,N)].i;
+                ti = wr * f[CHK(j,N)].i + wi * f[CHK(j,N)].r;
                 // Divide ith index elements by two (top half of above matrix)
-                q15 qr = f[CHK(i,N)].r >> 1;
-                q15 qi = f[CHK(i,N)].i >> 1;
+                float qr = f[CHK(i,N)].r / 2;
+                float qi = f[CHK(i,N)].i / 2;
                 // Compute the new values at each index
                 f[CHK(j,N)].r = qr - tr;
                 f[CHK(j,N)].i = qi - ti;
@@ -130,8 +126,8 @@ void FixedFFT::transform(cq15 f[]) const {
     }
 }
 
-float FixedFFT::binToFreq(uint16_t bin, float sampleFreq) const {
-    return ((float)bin * sampleFreq) / (float)N;
+float F32FFT::binToFreq(uint16_t bin, float sampleFreq) const {
+    return ((float)bin * sampleFreq) / N;
 }
 
 }

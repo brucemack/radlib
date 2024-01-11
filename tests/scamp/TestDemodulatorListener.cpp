@@ -53,7 +53,7 @@ void TestDemodulatorListener::badFrameReceived(uint32_t rawFrame) {
 
 void TestDemodulatorListener::received(char asciiChar) {
     _msg << asciiChar;
-    //_out << "CHAR: " << asciiChar << " " << (int)asciiChar << endl;
+    _out << "------- CHAR: " << asciiChar << " " << (int)asciiChar << endl;
 }
 
 string TestDemodulatorListener::getMessage() const {
@@ -63,9 +63,10 @@ string TestDemodulatorListener::getMessage() const {
 void TestDemodulatorListener::goodFrameReceived() {
 }
 
-void TestDemodulatorListener::sampleMetrics(q15 sample, uint8_t activeSymbol, bool capture, 
-   int32_t pllError,
-   float* symbolCorr, float corrThreshold, float corrDiff) {
+void TestDemodulatorListener::sampleMetrics(q15 sample, uint8_t activeSymbol, 
+   float* symbolCorr, bool isAnySymbolPresent) {
+
+    _recentCorrDiff = symbolCorr[1] - symbolCorr[0];
 
     if (_triggered) {
         if (_delayCounter > 0) {
@@ -75,12 +76,11 @@ void TestDemodulatorListener::sampleMetrics(q15 sample, uint8_t activeSymbol, bo
                 Sample* s = &(_sampleSpace[_sampleSpacePtr]);
                 s->sample = sample;
                 s->activeSymbol = activeSymbol;
-                s->capture = capture;
-                s->pllError = pllError;
+                s->capture = false;
+                s->pllError = 0;
                 s->symbolCorr[0] = symbolCorr[0];
                 s->symbolCorr[1] = symbolCorr[1];
-                s->corrThreshold = corrThreshold;
-                s->corrDiff = corrDiff;
+                s->isAnySymbolPresent = isAnySymbolPresent;
                 _sampleSpacePtr++;
             }
         }
@@ -88,6 +88,7 @@ void TestDemodulatorListener::sampleMetrics(q15 sample, uint8_t activeSymbol, bo
 }
 
 void TestDemodulatorListener::bitTransitionDetected() {
+    //cout << "Transition with diff: " << _recentCorrDiff << endl;
 }
 
 void TestDemodulatorListener::receivedBit(bool bit, uint16_t frameBitPos, 
@@ -132,8 +133,7 @@ void TestDemodulatorListener::dumpSamples(std::ostream& str) const {
             << s->pllError << " | " 
             << s->symbolCorr[1] << " " 
             << s->symbolCorr[0] << " | " 
-            << s->corrThreshold << " " 
-            << s->corrDiff << " " 
+            << s->symbolCorr[1] - s->symbolCorr[0]
             << endl;
     }
 }

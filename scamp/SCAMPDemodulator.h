@@ -52,7 +52,7 @@ public:
 
 protected:
 
-    virtual void _processSymbol(uint8_t symbol);
+    virtual void _processSymbol(bool isSymbolValid, uint8_t symbol);
 
 private:
 

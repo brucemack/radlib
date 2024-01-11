@@ -34,6 +34,8 @@ void TestFSKModulator2::sendSilence(uint32_t durationUs) {
 }
 
 static uint8_t randomFlip(uint8_t desiredSymbol) {
+    return desiredSymbol;
+    /*
     if (rand() % 100 > 92) {
         if (desiredSymbol == 1) {
             return 0;
@@ -43,6 +45,7 @@ static uint8_t randomFlip(uint8_t desiredSymbol) {
     } else {
         return desiredSymbol;
     }
+    */
 }
 
 void TestFSKModulator2::sendMark(uint32_t durationUs) {

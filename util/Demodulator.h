@@ -74,14 +74,32 @@ public:
     float getLastDCPower() const { return _lastDCPower; };
 
     float getMarkFreq() const;
+    
+    float getDetectionCorrelationThreshold() const {
+        return _detectionCorrelationThreshold;
+    }
+
+    /**
+     * Sets the threshold value that determines whether a symbol is being 
+     * heard vs noise.
+    */
+    void setDetectionCorrelationThreshold(float t) {
+        _detectionCorrelationThreshold = t;
+    }
 
 protected:
 
-    virtual void _processSymbol(uint8_t symbol) = 0;
+    /**
+     * This is called on every sample and indicates which symbol (if any) has been
+     * detected.
+     */
+    virtual void _processSymbol(bool symbolValid, uint8_t symbol) = 0;
 
     DemodulatorListener* _listener;
 
 private: 
+
+    void _clearCorrelationHistory();
 
     const uint16_t _sampleFreq;
     const uint16_t _fftN;
@@ -145,22 +163,17 @@ private:
     // These buffers are loaded based on the frequency that the decoder
     // decides to lock onto. The signal is convolved with these tones
     // for demodulation.
-    const unsigned int _symbolCount = SYMBOL_COUNT;
-    const uint16_t _demodulatorToneN = 16;
-    cq15 _demodulatorTone[SYMBOL_COUNT][16];
+    static const uint16_t _symbolCount = SYMBOL_COUNT;
+    static const uint16_t _demodulatorToneN = 16;
+    cq15 _demodulatorTone[_symbolCount][_demodulatorToneN];
 
-    // The most recent correlation for each symbol
-    float _symbolCorr[SYMBOL_COUNT];
+    // The most recent correlation history for each symbol
+    static const uint16_t _symbolCorrN = 64;
+    float _symbolCorr[_symbolCount][_symbolCorrN];
+    uint16_t _symbolCorrPtr = 0;
 
-    const uint16_t _maxCorrHistoryN = 32;
-    uint16_t _maxCorrHistoryPtr = 0;
-    // This buffers hold the recent history of the max correlation.  This
-    // is used to determine the threshold.
-    float _maxCorrHistory[32];
-
-    uint16_t _edgeRiseSampleCounter = 0;
+    float _detectionCorrelationThreshold = 0;
     float _lastCorrDiff = 0;
-    uint16_t _edgeRiseSampleLimit = 2;
 };
 
 }
