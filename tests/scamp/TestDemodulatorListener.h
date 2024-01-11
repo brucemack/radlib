@@ -49,13 +49,15 @@ public:
     TestDemodulatorListener(std::ostream& out,
         Sample* sampleSpace, uint16_t sampleSpaceSize);
 
-    virtual void dataSyncAcquired();
     virtual void frequencyLocked(uint16_t markFreq, uint16_t spaceFreq);
+    virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, float* symbolCorr, bool isAnySymbolPresent);
+    virtual void symbolTransitionDetected();
+
+    virtual void received(char asciiChar);
+
+    virtual void dataSyncAcquired();
     virtual void badFrameReceived(uint32_t rawFrame);
     virtual void goodFrameReceived();
-    virtual void received(char asciiChar);
-    virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, float* symbolCorr, bool isAnySymbolPresent);
-    virtual void bitTransitionDetected();
     virtual void receivedBit(bool bit, uint16_t frameBitPos, int syncFrameCorr);
 
     std::string getMessage() const;
@@ -78,7 +80,9 @@ private:
     TriggerMode _triggerMode = NONE;
     uint16_t _triggerDelay = 0;
     uint16_t _delayCounter = 0;
+
     float _recentCorrDiff = 0;
+    float _recentCorr[2];
 };
 
 }

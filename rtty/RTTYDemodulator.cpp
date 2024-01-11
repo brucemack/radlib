@@ -21,7 +21,7 @@ RTTYDemodulator::RTTYDemodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint1
     q15* fftTrigTable, q15* fftWindow,
     cq15* fftResultSpace, q15* bufferSpace) : 
     Demodulator(sampleFreq, lowestFreq, log2fftN, fftTrigTable, fftWindow, fftResultSpace, bufferSpace),
-    _decoder(sampleFreq, 4545, _windowSizeLog2, _window) {
+    _decoder(sampleFreq, 4545) {
 }
 
 void RTTYDemodulator::setListener(DemodulatorListener* listener) {

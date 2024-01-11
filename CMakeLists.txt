@@ -4,8 +4,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-fstack-protector-all -Wall -Wpedantic -g)
 
-add_executable(unit-test-1
-  tests/rtty/unit-test-1.cpp 
+add_executable(rtty-test-1
+  tests/rtty/rtty-test-1.cpp 
   tests/scamp/TestModem2.cpp 
   tests/scamp/TestDemodulatorListener.cpp 
   tests/TestFSKModulator.cpp 

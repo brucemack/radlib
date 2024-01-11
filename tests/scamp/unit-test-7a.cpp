@@ -84,11 +84,7 @@ int main(int, const char**) {
     // Note that we have applied random noise to the signal to ensure that 
     // this doesn't create a problem.
     TestModem2 modem2(samples, S, sampleFreq, 
-        markFreq + tuningErrorHz, spaceFreq + tuningErrorHz, 0.3, 0.1, 0.07);
-
-    // This is a modem that is used to capture the data for printing.
-    int8_t printSamples[34 * 30];
-    TestModem printModem(printSamples, sizeof(printSamples), 1);
+        markFreq + tuningErrorHz, spaceFreq + tuningErrorHz, 0.3, 0.1, 0.1);
 
     const char* testMessage1 = "DE KC1FSZ, GOOD MORNING";
     const char* testMessage2 = "73S, HAVE A GOOD DAY";
@@ -100,8 +96,7 @@ int main(int, const char**) {
         // Encode the message.  This leads to about 25K samples.
         Frame30 frames[32];
 
-        unsigned int frameCount1 = encodeString(testMessage1, frames, 45, true);
-        cout << "Used frames " << frameCount1 << endl;
+        unsigned int frameCount1 = encodeString(testMessage1, frames, 32, true);
         assertm(frameCount1 < 32, "FRAME COUNT");
     
         // This silence is 30 symbols, or 30 * 60 = 1800 samples long
@@ -110,11 +105,9 @@ int main(int, const char**) {
 
         for (unsigned int i = 0; i < frameCount1; i++) {
             frames[i].transmit(modem2, usPerSymbol);
-            frames[i].transmit(printModem, usPerSymbol);
             // TEST: Double-up one of the frames just to show that the decoder will ignore it
             if (i == 6) {
                 frames[i].transmit(modem2, usPerSymbol);
-                frames[i].transmit(printModem, usPerSymbol);            
             }
         }
         // Trailing silence
@@ -122,35 +115,17 @@ int main(int, const char**) {
             modem2.sendSilence(usPerSymbol);
         }
 
-        unsigned int frameCount2 = encodeString(testMessage2, frames, 45, true);
-        cout << "Used frames " << frameCount2 << endl;
+        unsigned int frameCount2 = encodeString(testMessage2, frames, 32, true);
         assertm(frameCount2 < 32, "FRAME COUNT");
 
         for (unsigned int i = 0; i < frameCount2; i++) {
             frames[i].transmit(modem2, usPerSymbol);
         }
-        // Trailing silence
-        //for (unsigned int i = 0; i < 30; i++) {
-        //    modem2.sendSilence();
-        //}
-    }
 
-    // Display
-    {
-        cout << endl << "Sending these frames:" << endl;
-        for (uint16_t i = 0; i < printModem.getSamplesUsed(); i++) {
-            if (i % 30 == 0) {
-                cout << endl;
-            }
-            if (printSamples[i] == 1) {
-                cout << "1";
-            } else if (printSamples[i] == -1) {
-                cout << "0";
-            } else {
-                cout << "?";
-            }
+        // Trailing silence
+        for (unsigned int i = 0; i < 30; i++) {
+            modem2.sendSilence(usPerSymbol);
         }
-        cout << endl << endl;
     }
 
     // Now decode without any prior knowledge of the frequency or phase
@@ -168,6 +143,8 @@ int main(int, const char**) {
         SCAMPDemodulator demod(sampleFreq, lowFreq, log2fftN,
             trigTable, window, fftResult, buffer);
         demod.setListener(&testListener);
+        // This is set experimentally
+        demod.setDetectionCorrelationThreshold(0.02);
 
         // Walk through the data one byte at a time.  We do something extra
         // each time we have processed a complete block.

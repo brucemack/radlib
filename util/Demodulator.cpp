@@ -312,7 +312,7 @@ void Demodulator::processSample(q15 sample) {
             } else {
                 _activeSymbol = 0;
             }
-            _listener->bitTransitionDetected();
+            _listener->symbolTransitionDetected();
         }
 
         bool aboveCorrelationThreshold = 

@@ -18,7 +18,6 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <cstdint>
 #include "../util/DataListener.h"
-#include "../util/WindowAverage.h"
 
 namespace radlib {
 
@@ -64,8 +63,7 @@ public:
      * @param windowArea Space used to hold the sample history to support
      *   averaging/filtering. Or 0 if no filtering is needed.
      */ 
-    BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100,
-        uint16_t windowSizeLog2, int16_t* windowArea);
+    BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100);
 
     void setDataListener(DataListener* l) { _listener = l; };
 
@@ -91,7 +89,6 @@ private:
     const uint16_t _samplesPerSymbol;
 
     BaudotMode _mode = BaudotMode::LTRS;
-    WindowAverage _avg;
     uint16_t _state;
     uint32_t _sampleCount;
     uint32_t _totalSampleCount;

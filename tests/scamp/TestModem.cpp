@@ -1,6 +1,5 @@
 /*
-SCAMP Encoder/Decoder
-Copyright (C) 2023 - Bruce MacKinnon KC1FSZ
+Copyright (C) 2024 - Bruce MacKinnon KC1FSZ
 
 This program is free software: you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free 
@@ -14,7 +13,10 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with 
 this program. If not, see <https://www.gnu.org/licenses/>.
 */
+#include <iostream>
 #include "TestModem.h"
+
+using namespace std;
 
 namespace radlib {
 
@@ -38,6 +40,7 @@ void TestModem::sendSilence(uint32_t us) {
 void TestModem::sendMark(uint32_t us) {
     // Convert us to samples
     uint32_t samples = (_sampleRate * us) / 1000000;
+    cout << samples << endl;
     for (unsigned int i = 0; i < samples; i++) {
         if (_samplesUsed < _samplesSize) {
             _samples[_samplesUsed++] = 1;

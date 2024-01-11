@@ -52,9 +52,6 @@ protected:
 
 private:
 
-    static const uint16_t _windowSizeLog2 = 3;
-    static const uint16_t _windowSize = 1 << _windowSizeLog2;
-    int16_t _window[_windowSize];
     BaudotDecoder _decoder;
 };
 

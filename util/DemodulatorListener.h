@@ -28,22 +28,29 @@ namespace radlib {
 class DemodulatorListener : public DataListener {
 public:
 
-    virtual void dataSyncAcquired() { }
-    virtual void dataSyncLost() { }
+    // ----- FSK Demodulator Methods ------------------------------------------
+
     virtual void frequencyLocked(uint16_t markFreq, uint16_t spaceFreq) { }
-    virtual void goodFrameReceived() { }
-    virtual void badFrameReceived(uint32_t rawFrame) { }
-    // NOTE: This comes from the DataListener interface!
-    virtual void received(char asciiChar) { }
-    virtual void bitTransitionDetected() { }
-    virtual void isSymbolPresent(bool e) { }
-    virtual void receivedBit(bool bit, uint16_t frameBitPos, int syncFrameCorr) { }
+    virtual void symbolTransitionDetected() { }
+    //virtual void isSymbolPresent(bool e) { }
 
     /**
      * The key data used to identify symbols.  
      * NOTE: This is called on every sample so be ready for a lot of data.
      */
     virtual void sampleMetrics(q15 sample, uint8_t activeSymbol, float* symbolCorr, bool isAnySymbolPresent) { }
+
+    // ----- DataListener Methods ---------------------------------------------
+
+    virtual void received(char asciiChar) { }
+
+    // ----- SCAMP-specific Methods -------------------------------------------
+
+    virtual void receivedBit(bool bit, uint16_t frameBitPos, int syncFrameCorr) { }
+    virtual void goodFrameReceived() { }
+    virtual void badFrameReceived(uint32_t rawFrame) { }
+    virtual void dataSyncAcquired() { }
+    //virtual void dataSyncLost() { }
 
     /**
      * Called when the receiver discards a duplicate codeword

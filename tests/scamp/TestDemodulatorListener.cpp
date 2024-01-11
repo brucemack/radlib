@@ -53,7 +53,7 @@ void TestDemodulatorListener::badFrameReceived(uint32_t rawFrame) {
 
 void TestDemodulatorListener::received(char asciiChar) {
     _msg << asciiChar;
-    _out << "------- CHAR: " << asciiChar << " " << (int)asciiChar << endl;
+    //_out << "------- CHAR: " << asciiChar << " " << (int)asciiChar << endl;
 }
 
 string TestDemodulatorListener::getMessage() const {
@@ -66,6 +66,8 @@ void TestDemodulatorListener::goodFrameReceived() {
 void TestDemodulatorListener::sampleMetrics(q15 sample, uint8_t activeSymbol, 
    float* symbolCorr, bool isAnySymbolPresent) {
 
+    _recentCorr[0] = symbolCorr[0];
+    _recentCorr[1] = symbolCorr[1];
     _recentCorrDiff = symbolCorr[1] - symbolCorr[0];
 
     if (_triggered) {
@@ -87,8 +89,8 @@ void TestDemodulatorListener::sampleMetrics(q15 sample, uint8_t activeSymbol,
     }
 }
 
-void TestDemodulatorListener::bitTransitionDetected() {
-    //cout << "Transition with diff: " << _recentCorrDiff << endl;
+void TestDemodulatorListener::symbolTransitionDetected() {
+    //cout << "Transition: " << _recentCorr[1] << "/" << _recentCorr[0] << endl;
 }
 
 void TestDemodulatorListener::receivedBit(bool bit, uint16_t frameBitPos, 

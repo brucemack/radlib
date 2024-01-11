@@ -63,11 +63,9 @@ const char BAUDOT_TO_ASCII_MAP[32][2] = {
     {   0, 0,  }    // LTRS
 };
 
-BaudotDecoder::BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100,
-    uint16_t windowSizeLog2, int16_t* windowArea) 
+BaudotDecoder::BaudotDecoder(uint16_t sampleRate, uint16_t baudRateTimes100) 
 :   _samplesPerSymbol((100 * sampleRate) / baudRateTimes100),
     _mode(BaudotMode::LTRS),
-    _avg(windowSizeLog2, windowArea),
     // In the initial state we are waiting to see a mark that can be used
     // as the basis for the start bit.
     _state(5),
@@ -83,7 +81,6 @@ void BaudotDecoder::reset() {
     // In the initial state we are waiting to see a mark that can be used
     // as the basis for the start bit.
     _state = 5;
-    _avg.reset();
     _sampleCount = 0;
     _totalSampleCount = 0;
     _invalidSampleCount = 0;
@@ -104,35 +101,10 @@ void BaudotDecoder::processSample(bool isSymbolValid, uint8_t symbol) {
         _invalidSampleCount++;
     }
 
-    const int16_t markVal = 32767;
-    const int16_t spaceVal = -32767;
-    const int16_t markThreshold = markVal >> 1;
-    const int16_t spaceThreshold = spaceVal >> 1;
-
-    // A windowed average is used to clean any noise out of the 
-    // symbol transitions.
-    int16_t rawSymbolQ15;
-    if (isSymbolValid)  {
-        rawSymbolQ15 = (symbol == 1) ? markVal : spaceVal;
-    } else {
-        rawSymbolQ15 = 0;
-    }
-
-    int16_t avgSymbol = _avg.sample(rawSymbolQ15);
-    int16_t smoothedSymbol;
-
-    if (avgSymbol > markThreshold) {
-        smoothedSymbol = 1;
-    } else if (avgSymbol < spaceThreshold) {
-        smoothedSymbol = -1;
-    } else {
-        smoothedSymbol = 0;
-    }
-
     // Watching for start bit
     if (_state == 0) {
-        // Trigger on the down transition
-        if (smoothedSymbol == -1) {
+        // Trigger on the down transition with a valid symbol
+        if (isSymbolValid && symbol == 0) {
             _state = 1;
             _sampleCount = 0;
             //cout << "Start at " << _totalSampleCount << " " << (float)_totalSampleCount / 330.0 << " " << _invalidSampleCount << endl;
@@ -154,7 +126,7 @@ void BaudotDecoder::processSample(bool isSymbolValid, uint8_t symbol) {
             //cout << "  Capture " << smoothedSymbol << " " << avgSymbol << " " << " " << (float)_totalSampleCount / 330.0 << endl;
             // Shift in a new symbol
             _symbolAcc <<= 1;
-            if (smoothedSymbol == 1) {
+            if (symbol == 1) {
                 _symbolAcc |= 1;
             }
             _symbolCount++;
@@ -203,7 +175,7 @@ void BaudotDecoder::processSample(bool isSymbolValid, uint8_t symbol) {
     }
     // This is the state where we are waiting to see us go back to mark
     else if (_state == 5) {
-        if (smoothedSymbol == 1) {
+        if (isSymbolValid && symbol == 1) {
             _sampleCount = 0;
             _state = 0;
         }
