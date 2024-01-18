@@ -20,8 +20,11 @@ public:
 
 private:
 
+    // State preserved between segments
     int16_t z1;
     int32_t L_z2;
+    int16_t mp;
+
 };
 
 }

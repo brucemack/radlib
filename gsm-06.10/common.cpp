@@ -82,4 +82,15 @@ int32_t L_sub(int32_t L_var1, int32_t L_var2) {
     return 0;
 }
 
+/**
+ * norm produces the number of left shifts needed to normalize the 32 bits variable L_var1 for
+ * positive values on the interval with minimum of 1073741824 and maximum of 2147483647 and
+ * for negative values on the interval with minimum of -2147483648 and maximum of -1073741824;
+ * in order to normalize the result, the following operation shall be done: L_norm_var1 = L_var1 <<
+ * norm(L_var1)
+*/
+int16_t norm(int32_t L_var1) {
+    return 0;
+}
+
 }
