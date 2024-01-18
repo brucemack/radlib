@@ -29,6 +29,14 @@ add_executable(util-test-1
   util/WindowAverage.cpp 
 )
 
+add_executable(gsm-test-1
+  tests/gsm-06.10/unit-test-1.cpp
+  gsm-06.10/common.cpp
+  gsm-06.10/Encoder.cpp
+  util/fixed_math.cpp 
+  util/fixed_fft.cpp 
+  util/dsp_util.cpp 
+)
 
 add_executable(unit-test-2
   tests/unit-test-2.cpp
