@@ -6,6 +6,8 @@
 #ifndef _Encoder_h
 #define _Encoder_h
 
+#include "Parameters.h"
+
 namespace radlib {
 
 class Encoder {
@@ -16,7 +18,7 @@ public:
 
     Encoder();
     void reset();
-    void encode(const int16_t sop[], uint8_t out[]);
+    void encode(const int16_t sop[], Parameters* out);
 
 private:
 

@@ -3,10 +3,20 @@
  * 
  * NOT FOR COMMERCIAL USE.
  */
+#include <cassert>
 #include "common.h"
 #include "Encoder.h"
 
+// Sanity checking function for index bounds
+#define IX(x, lo, hi) (_checkIx(x, lo, hi))
+
 namespace radlib {
+
+// Sanity checking function for index bounds
+static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
+    assert(x >= lo && x <= hi);
+    return x;
+}
 
 // See table 5.1 on page 43
 // NOTE: The 0th entry is not used.  The draft uses index [1..8]
@@ -69,7 +79,7 @@ void Encoder::reset() {
         _u[i] = 0;
     }
     for (uint16_t i = 0; i < 120; i++) {
-        _dp[i] = 0;
+        _dp[IX(i, 0, 119)] = 0;
     }
 }
 
@@ -81,13 +91,13 @@ void Encoder::reset() {
  * Variable names from the draft are preserved, even when they violate common C++ coding
  * conventions.
 */
-void Encoder::encode(const int16_t sop[], uint8_t out[]) {
+void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     int16_t so[120];
     int16_t s1 = 0;
     int32_t L_s2;
-    int16_t msp, lsp, exp, mant, xmax, xmaxc, itest;
-    int16_t temp, temp1, temp2, temp3, di, sav, Nc, bc, bp, EM, Mc, R, S;
+    int16_t msp, lsp, exp, mant, xmax, itest;
+    int16_t temp, temp1, temp2, temp3, di, sav, bp, EM, R, S;
     int16_t sof[120];
     int16_t s[120];
     int16_t smax, dmax;
@@ -99,7 +109,6 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     int16_t r[9];
     int16_t LAR[9];
     int16_t K[9];
-    int16_t LARc[9];
     int16_t LARpp[9];
     // Here we have four sets of coefficients for different zones
     // in the segment
@@ -114,7 +123,6 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     int16_t e[40];
     int16_t ep[40];
     int16_t xM[13];
-    int16_t xMc[13];
     int16_t xMp[13];
 
     // Section 5.2.1 - Scaling of the input variable
@@ -267,6 +275,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     }
 
     // Section 5.2.7. - Quantization and coding of the Log-Area Ratios
+    int16_t LARc[9];
 
     // Computation for quantizing and coding the LAR[1..8]
     // A[], B[] are lookup tables 5.1
@@ -285,6 +294,11 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
         // NOTE: The equation is used to make all of the LARc[i] positive
         LARc[i] = sub(LARc[i], MIC[i]);
     }
+
+    // Write out the parameters.
+    // NOTE: The draft uses index [1..8] for the LARc array
+    for (uint16_t i = 0; i < 8; i++)
+        output->LARc[i]= LARc[i + 1];
 
     // ===== SHORT TERM ANALYSIS FILTERING SECTION ===========================
 
@@ -361,258 +375,272 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
     // ===== LONG TERM PREDICTOR SECTION =====================================
 
-    // Section 5.2.11 Calculation of the LTP parameters
+    // This part runs four times, once for each sub-segment.  In keeping with 
+    // the draft convention, we use "j" to denote the sub-segment.
 
-    // Search of the optimum scaling of d[0..39]
-    dmax = 0;
-    for (uint16_t k = 0; k <= 39; k++) {
-        temp = s_abs(d[k]);
-        if (temp > dmax) {
-            dmax = temp;
+    for (uint16_t j = 0; j < 4; j++) {
+
+        // Compute the starting index
+        uint16_t kj = j * 40;
+
+        // Section 5.2.11 Calculation of the LTP parameters
+
+        // Search of the optimum scaling of d(j)[0..39]
+        dmax = 0;
+        for (uint16_t k = 0; k <= 39; k++) {        
+            // NOTE: Sub-segment index
+            temp = s_abs(d[kj + k]);
+            if (temp > dmax) {
+                dmax = temp;
+            }
         }
-    }
 
-    temp = 0;
-    if (dmax == 0) {
-        scal = 0;
-    } else {
-        temp = norm(dmax << 16);
-    }
-    if (temp > 6) {
-        scal = 0;
-    } else {
-        scal = sub(6, temp);
-    }
-
-    // Initialization of a working array wt[0..39]
-    for (uint16_t k = 0; k <= 39; k++) {
-        wt[k] = d[k] >> scal;
-    }
-
-    // Search for the maximum cross-correlation and coding of the LTP lag
-    L_max = 0;
-    // Index for max cross-corelation
-    Nc = 40;    
-    for (uint16_t lambda = 40; lambda <= 120; lambda++) {
-        L_result = 0;
-        for (uint16_t k = 0; k < 40; k++) {
-            // NOTE: Index adjustment vs. draft doc
-            L_temp = L_mult(wt[k], _dp[(k - lambda) + 120]);
-            L_result = L_add(L_temp, L_result);
-        }
-        if (L_result > L_max) {
-            Nc = lambda;
-            L_max = L_result;
-        }
-    }
-
-    // Rescaling of L_max
-    L_max = L_max >> (sub(6, scal));
-
-    // Initialization of a working array wt[0..39]
-    for (uint16_t k = 0; k <= 39; k++) {
-        // NOTE: Index adjustment vs. draft doc
-        wt[k] = _dp[(k - Nc) + 120] >> 3;
-    }
-
-    // Compute the power of te reconstructed short term residual signal dp[..]
-    L_power = 0;
-    for (uint16_t k = 0; k <= 39; k++) {
-        L_temp = L_mult(wt[k], wt[k]);
-        L_power = L_add(L_temp, L_power);
-    }
-
-    // Normalization of L_max and L_power
-    if (L_max <= 0) {
-        bc = 0;
-    } else if (L_max >= L_power) {
-        bc = 3;
-    } else {
-        temp = norm(L_power);
-        R = (L_max << temp) >> 16;
-        S = (L_power << temp) >> 16;
-
-        // Coding of the LTP gain
-        if (R <= mult(S, DLB[0])) {
-            bc = 0;
-        } else if (R <= mult(S, DLB[1])) {
-            bc = 1;
-        } else if (R <= mult(S, DLB[2])) {
-            bc = 2;
+        temp = 0;
+        if (dmax == 0) {
+            scal = 0;
         } else {
-            bc = 3;
+            temp = norm(dmax << 16);
         }
-   }
-
-   // Section 5.2.12 - Long term analysis filtering
-   // In this part we have to decode the bc parameter to compute the samples
-   // of the estimate of dpp[0..39].
-
-   // Decoding of the coded LTP gain
-   bp = QLB[bc];
-
-    // Calculating the array e[0..39] and the array dpp[0..39]
-    // e[] is the long-term residual signal
-    for (uint16_t k = 0; k <= 39; k++) {
-        // NOTE: Index adjustment vs. draft doc
-        dpp[k] = mult_r(bp, _dp[(k - Nc) + 120]);
-        e[k] = sub(d[k], dpp[k]);
-    }
-
-    // ===== RPE ENCODING SECTION =============================================
-
-    // Section 5.2.13 - Weighting filter
-
-    // Initialization of a temporary working array wt[0..49]
-    for (uint16_t k = 0; k <= 4; k++) {
-        wt[k] = 0;
-    }    
-    for (uint16_t k = 5; k <= 44; k++) {
-        wt[k] = e[k-5];
-    }
-    for (uint16_t k = 45; k <= 49; k++) {
-        wt[k] = 0;
-    }
-
-    // Compute the signal x[0..39]
-    for (uint16_t k = 0; k <= 39; k++) {
-        // Rouding of the output of the filter
-        L_result = 8192;
-        for (uint16_t i = 0; i <= 10; i++) {
-            L_temp = L_mult(wt[k + i], H[i]);
-            L_result = L_add(L_result, L_temp);
+        if (temp > 6) {
+            scal = 0;
+        } else {
+            scal = sub(6, temp);
         }
-        // Scaling x4
-        L_result = L_add(L_result, L_result);
-        L_result = L_add(L_result, L_result);
-        x[k] = L_result >> 16;
-    }
 
-    // Section 5.2.14 - RPE grid selection
-    EM = 0;
-    Mc = 0;
+        // Initialization of a working array wt[0..39]
+        for (uint16_t k = 0; k <= 39; k++) {
+            // NOTE: Sub-segment index
+            wt[k] = d[kj + k] >> scal;
+        }
 
-    for (uint16_t m = 0; m <= 3; m++) {
-        L_result = 0;
+        // Search for the maximum cross-correlation and coding of the LTP lag
+        L_max = 0;
+        // Index for max cross-corelation
+        output->subSegs[j].Nc = 40;    
+        for (uint16_t lambda = 40; lambda <= 120; lambda++) {
+            // Cross correlate with each distinct lag
+            L_result = 0;
+            for (uint16_t k = 0; k < 40; k++) {
+                // NOTE: Index adjustment vs. draft doc
+                L_temp = L_mult(wt[k], _dp[IX((k - lambda) + 120, 0, 119)]);
+                L_result = L_add(L_temp, L_result);
+            }
+            if (L_result > L_max) {
+                output->subSegs[j].Nc = lambda;
+                L_max = L_result;
+            }
+        }
+
+        // Rescaling of L_max
+        L_max = L_max >> (sub(6, scal));
+
+        // Initialization of a working array wt[0..39]
+        for (uint16_t k = 0; k <= 39; k++) {
+            // NOTE: Index adjustment vs. draft doc
+            wt[k] = _dp[IX((k - output->subSegs[j].Nc) + 120, 0, 119)] >> 3;
+        }
+
+        // Compute the power of te reconstructed short term residual signal dp[..]
+        L_power = 0;
+        for (uint16_t k = 0; k <= 39; k++) {
+            L_temp = L_mult(wt[k], wt[k]);
+            L_power = L_add(L_temp, L_power);
+        }
+
+        // Normalization of L_max and L_power
+        if (L_max <= 0) {
+            output->subSegs[j].bc = 0;
+        } else if (L_max >= L_power) {
+            output->subSegs[j].bc = 3;
+        } else {
+            temp = norm(L_power);
+            R = (L_max << temp) >> 16;
+            S = (L_power << temp) >> 16;
+
+            // Coding of the LTP gain
+            if (R <= mult(S, DLB[0])) {
+                output->subSegs[j].bc = 0;
+            } else if (R <= mult(S, DLB[1])) {
+                output->subSegs[j].bc = 1;
+            } else if (R <= mult(S, DLB[2])) {
+                output->subSegs[j].bc = 2;
+            } else {
+                output->subSegs[j].bc = 3;
+            }
+        }
+
+        // Section 5.2.12 - Long term analysis filtering
+        // In this part we have to decode the bc parameter to compute the samples
+        // of the estimate of dpp[0..39].
+
+        // Decoding of the coded LTP gain
+        bp = QLB[output->subSegs[j].bc];
+
+        // Calculating the array e[0..39] and the array dpp[0..39]
+        // e[] is the long-term residual signal
+        for (uint16_t k = 0; k <= 39; k++) {
+            // NOTE: Index adjustment vs. draft doc
+            // TODO: IS _dp INDEX RIGHT HERE??
+            dpp[k] = mult_r(bp, _dp[IX((k - output->subSegs[j].Nc) + 120, 0, 119)]);
+            // NOTE: Sub-segment adjustment 
+            e[k] = sub(d[kj + k], dpp[k]);
+        }
+
+        // ===== RPE ENCODING SECTION =============================================
+
+        // Section 5.2.13 - Weighting filter
+
+        // Initialization of a temporary working array wt[0..49]
+        for (uint16_t k = 0; k <= 4; k++) {
+            wt[k] = 0;
+        }    
+        for (uint16_t k = 5; k <= 44; k++) {
+            wt[k] = e[k-5];
+        }
+        for (uint16_t k = 45; k <= 49; k++) {
+            wt[k] = 0;
+        }
+
+        // Compute the signal x[0..39]
+        for (uint16_t k = 0; k <= 39; k++) {
+            // Rounding of the output of the filter
+            L_result = 8192;
+            for (uint16_t i = 0; i <= 10; i++) {
+                L_temp = L_mult(wt[k + i], H[i]);
+                L_result = L_add(L_result, L_temp);
+            }
+            // Scaling x4
+            L_result = L_add(L_result, L_result);
+            L_result = L_add(L_result, L_result);
+            x[k] = L_result >> 16;
+        }
+
+        // Section 5.2.14 - RPE grid selection
+        EM = 0;
+        output->subSegs[j].Mc = 0;
+
+        for (uint16_t m = 0; m <= 3; m++) {
+            L_result = 0;
+            for (uint16_t i = 0; i <= 12; i++) {
+                temp1 = x[m + (3 * i)] >> 2;
+                L_temp = L_mult(temp1, temp1);
+                L_result = L_add(L_temp, L_result);
+            }
+            if (L_result > EM) {
+                output->subSegs[j].Mc = m;
+                EM = L_result;
+            }
+        }
+
+        // Down-sampling by a factor 3 to get the selected xM[0..12] RPE 
+        // sequence.
         for (uint16_t i = 0; i <= 12; i++) {
-            temp1 = x[m + (3 * i)] >> 2;
-            L_temp = L_mult(temp1, temp1);
-            L_result = L_add(L_temp, L_result);
+            xM[i] = x[output->subSegs[j].Mc + (3 * i)];
         }
-        if (L_result > EM) {
-            Mc = m;
-            EM = L_result;
+
+        // Section 5.2.15 - APCM quantization of the selected RPE sequence
+        xmax = 0;
+        for (uint16_t i = 0; i <= 12; i++) {
+            temp = s_abs(xM[i]);
+            if (temp > xmax) {
+                xmax = temp;
+            }
         }
-    }
 
-    // Down-sampling by a factor 3 to get teh selected xM[0..12] RPE 
-    // sequence.
-    for (uint16_t i = 0; i <= 12; i++) {
-        xM[i] = x[Mc + (3 * i)];
-    }
-
-    // Section 5.2.15 - APCM quantization of the selected RPE sequence
-    xmax = 0;
-    for (uint16_t i = 0; i <= 12; i++) {
-        temp = s_abs(xM[i]);
-        if (temp > xmax) {
-            xmax = temp;
-        }
-    }
-
-    // Quantizing and coding of xmax to get xmaxc
-    exp = 0;
-    temp = xmax >> 9;
-    itest = 0;
-    for (uint16_t i = 0; i <= 5; i++) {
-        if (temp <= 0) {
-            itest = 1;
-        }
-        temp = temp >> 1;
-        if (itest == 0) {
-            exp = add(exp, i);
-        }
-    }
-    temp = add(exp, 5);
-    xmaxc = add((xmax >> temp), (exp << 3));
-
-    // Quantizing and coding of the xM[0..12] RPE sequence to get xMc[0..12]
-
-    // Compute exponent and mantissa of teh decoded version of xmaxc
-    exp = 0;
-    if (xmaxc > 15) {
-        exp = sub((xmaxc >> 3), 1);    
-    }
-    mant = sub(xmaxc, (exp << 3));
-
-    // Normalize mantissa0 <= mant <= 7
-    if (mant == 0) {
-        exp = -4;
-        mant = 15;
-    } else {
+        // Quantizing and coding of xmax to get xmaxc
+        exp = 0;
+        temp = xmax >> 9;
         itest = 0;
-        for (uint16_t i = 0; i <= 2; i++) {
-            if (mant > 7) {
+        for (uint16_t i = 0; i <= 5; i++) {
+            if (temp <= 0) {
                 itest = 1;
             }
+            temp = temp >> 1;
             if (itest == 0) {
-                mant = add((mant << 1), 1);
-            }
-            if (itest == 0) {
-                exp = sub(exp, 1);
+                exp = add(exp, i);
             }
         }
-    }
-    mant = sub(mant, 8);
+        temp = add(exp, 5);
+        output->subSegs[j].xmaxc = add((xmax >> temp), (exp << 3));
 
-    // Direct computation of xMc[0..12] using table 5.5
-    // Normalized by the exponent
-    temp1 = sub(6, exp);
-    // See table 5.5 (inverse mantissa)
-    temp2 = NRFAC[mant];
-    for (uint16_t i = 0; i <= 12; i++) {
-        temp = xM[i] << temp1;
-        temp = mult(temp, temp2);
-        // This equation is used to make all the xMc[i] positive
-        xMc[i] = add((temp >> 12), 4);
-    }
+        // Quantizing and coding of the xM[0..12] RPE sequence to get xMc[0..12]
 
-    // Section 5.2.16 - APCM inverse quantization
-    temp1 = FAC[mant];
-    temp2 = sub(6, exp);
-    temp3 = 1 << sub(temp2, 1);
-    for (uint16_t i = 0; i <= 12; i++) {
-        // This subtraction is used to restore the sign of xMc[i]
-        temp = sub((xMc[i] << 1), 7);
-        temp = temp << 12;
-        temp = mult_r(temp1, temp);
-        temp = add(temp, temp3);
-        xMp[i] = temp >> temp2;
-    }
+        // Compute exponent and mantissa of teh decoded version of xmaxc
+        exp = 0;
+        if (output->subSegs[j].xmaxc > 15) {
+            exp = sub((output->subSegs[j].xmaxc >> 3), 1);    
+        }
+        mant = sub(output->subSegs[j].xmaxc, (exp << 3));
 
-    // Section 5.2.17 RPE grid positioning
-    // ep[] is the reconstructed long term residual
-    for (uint16_t k = 0; k <= 39; k++) {
-        ep[k] = 0;
-    }
-    for (uint16_t i = 0; i <= 12; i++) {
-        ep[Mc + (3 * i)] = xMp[i];
-    }
+        // Normalize mantissa0 <= mant <= 7
+        if (mant == 0) {
+            exp = -4;
+            mant = 15;
+        } else {
+            itest = 0;
+            for (uint16_t i = 0; i <= 2; i++) {
+                if (mant > 7) {
+                    itest = 1;
+                }
+                if (itest == 0) {
+                    mant = add((mant << 1), 1);
+                }
+                if (itest == 0) {
+                    exp = sub(exp, 1);
+                }
+            }
+        }
+        mant = sub(mant, 8);
 
-    // Section 5.2.18 - Update of the reconstructed short term residual
-    // signal dp[-120,1].
-    for (uint16_t k = 0; k <= 79; k++) {
-        // Shift 80 items
-        // Original document: 
-        // First index: -120 -> -41
-        // Second index: -80 -> -1
-        //
-        // NOTE: Here we have changed the notation from the draft document!
-        _dp[(-120 + k) + 120] = _dp[(-80 + k) + 120];
-    }
-    for (uint16_t k = 0; k <= 39; k++) {
-        // NOTE: Here we have changed the notation from the draft document!
-        _dp[(-40 + k) + 120] = add(ep[k], dpp[k]);
+        // Direct computation of xMc[0..12] using table 5.5
+        // Normalized by the exponent
+        temp1 = sub(6, exp);
+        // See table 5.5 (inverse mantissa)
+        temp2 = NRFAC[mant];
+        for (uint16_t i = 0; i <= 12; i++) {
+            temp = xM[i] << temp1;
+            temp = mult(temp, temp2);
+            // This equation is used to make all the xMc[i] positive
+            output->subSegs[j].xMc[i] = add((temp >> 12), 4);
+        }
+
+        // Section 5.2.16 - APCM inverse quantization
+        temp1 = FAC[mant];
+        temp2 = sub(6, exp);
+        temp3 = 1 << sub(temp2, 1);
+        for (uint16_t i = 0; i <= 12; i++) {
+            // This subtraction is used to restore the sign of xMc[i]
+            temp = sub((output->subSegs[j].xMc[i] << 1), 7);
+            temp = temp << 12;
+            temp = mult_r(temp1, temp);
+            temp = add(temp, temp3);
+            xMp[i] = temp >> temp2;
+        }
+
+        // Section 5.2.17 RPE grid positioning
+        // ep[] is the reconstructed long term residual
+        for (uint16_t k = 0; k <= 39; k++) {
+            ep[k] = 0;
+        }
+        for (uint16_t i = 0; i <= 12; i++) {
+            ep[output->subSegs[j].Mc + (3 * i)] = xMp[i];
+        }
+    
+        // Section 5.2.18 - Update of the reconstructed short term residual
+        // signal dp[-120,1].
+        for (uint16_t k = 0; k <= 79; k++) {
+            // Shift 80 items
+            // Original document: 
+            // First index: -120 -> -41
+            // Second index: -80 -> -1
+            //
+            // NOTE: Here we have changed the notation from the draft document!
+            _dp[IX((-120 + k) + 120, 0, 119)] = _dp[IX((-80 + k) + 120, 0, 119)];
+        }
+        for (uint16_t k = 0; k <= 39; k++) {
+            // NOTE: Here we have changed the notation from the draft document!
+            _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[k], dpp[k]);
+        }
     }
 }
 
