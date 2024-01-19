@@ -2,6 +2,7 @@
 #include <iostream>
 #include <bitset>
 #include "../../gsm-06.10/common.h"
+#include "../../gsm-06.10/Parameters.h"
 #include "../../gsm-06.10/Encoder.h"
 
 using namespace radlib;
@@ -183,6 +184,8 @@ static void math_tests() {
 int main(int, const char**) {
     
     math_tests();
+
+    assert(sizeof(Parameters) == 76);
 
     Encoder e;
     int16_t input[160];
