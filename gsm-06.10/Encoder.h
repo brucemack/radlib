@@ -24,7 +24,11 @@ private:
     int16_t z1;
     int32_t L_z2;
     int16_t mp;
-
+    int16_t LARpp_last[9];
+    int16_t u[8];
+    // NOTE: Indexing in draft document is -120 to -1, but 
+    // we treat this as 0 to 119.
+    int16_t dp[120];
 };
 
 }
