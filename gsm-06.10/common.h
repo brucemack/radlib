@@ -9,6 +9,7 @@
 #include <cstdint>
 
 namespace radlib {
+
 /**
  * Performs the addition (var1+var2) with overflow control and saturation; the result is set at +32767
  * when overflow occurs or at -32768 when underflow occurs.
@@ -36,7 +37,7 @@ int16_t mult_r(int16_t var1, int16_t var2);
 /** 
  * Absolute value of var1; abs(-32768) = 32767
  */ 
-int16_t abs(int16_t var1); 
+int16_t s_abs(int16_t var1); 
 
 /**
  * div produces a result which is the fractional integer division of var1 by var2; var1 and var2 shall

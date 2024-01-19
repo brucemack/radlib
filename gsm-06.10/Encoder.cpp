@@ -1,23 +1,12 @@
-
+/**
+ * Copyright (C) 2024, Bruce MacKinnon KC1FSZ
+ * 
+ * NOT FOR COMMERCIAL USE.
+ */
 #include "common.h"
 #include "Encoder.h"
 
 namespace radlib {
-
-/**
- * Converts an index k[0..159] to the zone[0..3] as defined in Table 3.2.
-*/
-static uint16_t k2zone(uint16_t k) {
-    if (k <= 12) {
-        return 0;
-    } else if (k <= 26) {
-        return 1;
-    } else if (k <= 39) {
-        return 2;
-    } else { 
-        return 3;
-    }
-}
 
 // See table 5.1 on page 43
 // NOTE: The 0th entry is not used.  The draft uses index [1..8]
@@ -50,22 +39,37 @@ static const int16_t NRFAC[8] = { 29128, 26215, 23832, 21846, 20165, 18725, 1747
 // See page 44
 static const int16_t FAC[8] = { 18431, 20479, 22527, 24575, 26623, 28671, 30719, 32767 };
 
+/**
+ * Converts an index k[0..159] to the zone[0..3] as defined in Table 3.2.
+*/
+static uint16_t k2zone(uint16_t k) {
+    if (k <= 12) {
+        return 0;
+    } else if (k <= 26) {
+        return 1;
+    } else if (k <= 39) {
+        return 2;
+    } else { 
+        return 3;
+    }
+}
+
 Encoder::Encoder() {
     reset();
 }
 
 void Encoder::reset() {
-    z1 = 0;
-    L_z2 = 0;
-    mp = 0;
+    _z1 = 0;
+    _L_z2 = 0;
+    _mp = 0;
     for (uint16_t i = 1; i <= 8; i++) {
-        LARpp_last[i] = 0;
+        _LARpp_last[i] = 0;
     }
     for (uint16_t i = 0; i < 8; i++) {
-        u[i] = 0;
+        _u[i] = 0;
     }
     for (uint16_t i = 0; i < 120; i++) {
-        dp[i] = 0;
+        _dp[i] = 0;
     }
 }
 
@@ -79,14 +83,13 @@ void Encoder::reset() {
 */
 void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
-    int16_t so[SEGMENT_N];
-    int16_t z1 = 0;
+    int16_t so[120];
     int16_t s1 = 0;
     int32_t L_s2;
     int16_t msp, lsp, exp, mant, xmax, xmaxc, itest;
     int16_t temp, temp1, temp2, temp3, di, sav, Nc, bc, bp, EM, Mc, R, S;
-    int16_t sof[SEGMENT_N];
-    int16_t s[SEGMENT_N];
+    int16_t sof[120];
+    int16_t s[120];
     int16_t smax, dmax;
     int16_t scal, scalauto = 0;
     int32_t L_ACF[9];
@@ -103,7 +106,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     int16_t LARp[4];
     int16_t rp[4][9];
     // This is the short-term residual signal
-    int16_t d[SEGMENT_N];
+    int16_t d[120];
     int16_t wt[50];
     int16_t x[40];
     int16_t dpp[40];
@@ -115,7 +118,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     int16_t xMp[13];
 
     // Section 5.2.1 - Scaling of the input variable
-    for (uint16_t k = 0; k < SEGMENT_N; k++) {
+    for (uint16_t k = 0; k < 120; k++) {
         // Shift away the 3 low-order (dont' care) bits
         so[k] = sop[k] >> 3;
         // Back in q15 format divided by two
@@ -123,27 +126,31 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     }
 
     // Section 5.2.2 - Offset compensation
-    for (uint16_t k = 0; k < SEGMENT_N; k++) {
+    for (uint16_t k = 0; k < 120; k++) {
 
-        s1 = sub(so[k], z1);
-        z1 = so[k];
+        // Compute the non-recursive part
+        s1 = sub(so[k], _z1);
+        _z1 = so[k];
 
+        // Compute the recursive part
         L_s2 = s1;
         L_s2 = L_s2 << 15;
 
-        msp = L_z2 >> 15;
-        lsp = L_sub(L_z2, (msp << 15));
+        // Execution of a 31 by 16 bit multiplication
+        msp = _L_z2 >> 15;
+        lsp = L_sub(_L_z2, (msp << 15));
         temp = mult_r(lsp, 32735);
         L_s2 = L_add(L_s2, temp);
-        L_z2 = L_add(L_mult(msp, 32735) >> 1, L_s2);
+        _L_z2 = L_add(L_mult(msp, 32735) >> 1, L_s2);
 
-        sof[k] = L_add(L_z2, 16384) >> 15;
+        // Compute sof[k] with rounding
+        sof[k] = L_add(_L_z2, 16384) >> 15;
     }
 
     // Section 5.2.3 - Pre-emphasis
-    for (uint16_t k = 0; k < SEGMENT_N; k++) {
-        s[k] = add(sof[k], mult_r(mp, -28180));
-        mp = sof[k];
+    for (uint16_t k = 0; k < 120; k++) {
+        s[k] = add(sof[k], mult_r(_mp, -28180));
+        _mp = sof[k];
     }
 
     // Section 5.2.4 - Autocorrelation
@@ -153,8 +160,8 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
     // Search for the maximum
     smax = 0;
-    for (uint16_t k = 0; k < SEGMENT_N; k++) {
-        temp = abs(s[k]);
+    for (uint16_t k = 0; k < 120; k++) {
+        temp = s_abs(s[k]);
         if (temp > smax) {
             smax = temp;
         }
@@ -170,7 +177,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // Scaling of the array s[0..159]
     if (scalauto > 0) {
         temp = 16384 >> sub(scalauto, 1);
-        for (uint16_t k = 0; k < SEGMENT_N; k++) {
+        for (uint16_t k = 0; k < 120; k++) {
             s[k] = mult_r(s[k], temp);
         }
     }
@@ -178,7 +185,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // Compute the L_ACF[..]
     for (uint16_t k = 0; k <= 8; k++) {
         L_ACF[k] = 0;
-        for (uint16_t i = k; i < SEGMENT_N; i++) {
+        for (uint16_t i = k; i < 120; i++) {
             L_temp = L_mult(s[i], s[i - k]);
             L_ACF[k] = L_add(L_ACF[k], L_temp);
         }
@@ -186,7 +193,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
     // Rescaling of the array s[0..159]
     if (scalauto > 0) {
-        for (uint16_t k = 0; k < SEGMENT_N; k++) {
+        for (uint16_t k = 0; k < 120; k++) {
             s[k] = s[k] << scalauto;
         }
     }
@@ -215,14 +222,14 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
         // Compute reflection coefficients
         for (uint16_t n = 1; n <= 8; n++) {
-            if (P[0] < abs(P[1])) {
+            if (P[0] < s_abs(P[1])) {
                 for (uint16_t i = n; i <= 8; i++) {
                     r[i] = 0;
                 }
                 // Continue with 5.2.6
                 break;
             }
-            r[n] = div(abs(P[1]), P[0]);
+            r[n] = div(s_abs(P[1]), P[0]);
             if (P[1] > 0) {
                 r[n] = sub(0, r[n]);
             }
@@ -244,7 +251,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
     // Computation of the LAR[1..8] from the r[1..8]
     for (uint16_t i = 1; i <= 8; i++) {
-        temp = abs(r[i]);
+        temp = s_abs(r[i]);
         if (temp < 22118) {
             temp = temp >> 1;
         }
@@ -299,12 +306,12 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
         // Section 5.2.9.1 - Interpolation of the LARpp[1..8] to get the LARp[1..8]
         // Zone 0
-        LARp[0] = add((LARpp_last[i] >> 2), (LARpp[i] >> 2));
-        LARp[0] = add(LARp[0], (LARpp_last[i] >> 1));
+        LARp[0] = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
+        LARp[0] = add(LARp[0], (_LARpp_last[i] >> 1));
         // Zone 1
-        LARp[1] = add((LARpp_last[i] >> 1), (LARpp[i] >> 1));
+        LARp[1] = add((_LARpp_last[i] >> 1), (LARpp[i] >> 1));
         // Zone 2
-        LARp[2] = add((LARpp_last[i] >> 2), (LARpp[i] >> 2));
+        LARp[2] = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
         LARp[2] = add((LARpp[2]), (LARpp[i] >> 1));
         // Zone 3
         LARp[3] = LARpp[i];
@@ -313,7 +320,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
         // LARp[1..8]
 
         for (uint16_t zone = 0; zone < 4; zone++) {
-            temp = abs(LARp[zone]);
+            temp = s_abs(LARp[zone]);
             if (temp < 11059) {
                 temp = temp << 1;
             } else if (temp < 20070) {
@@ -330,7 +337,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
 
     // Once we've used the LARpp_last, copy the new values for next time
     for (uint16_t i = 1; i <= 8; i++) {
-        LARpp_last[i] = LARpp[i];
+        _LARpp_last[i] = LARpp[i];
     }
 
     // Section 5.2.10 - Short term analysis filtering
@@ -339,14 +346,14 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // sets of rp coefficients.
 
     // Calculate d[] which is the short-term residual
-    for (uint16_t k = 0; k < SEGMENT_N; k++) {
+    for (uint16_t k = 0; k < 120; k++) {
         uint16_t zone = k2zone(k);
         di = s[k];
         sav = di;
         for (uint16_t i = 1; i <= 8; i++) {
-            temp = add(u[i - 1], mult_r(rp[zone][i], di));
-            di = add(di, mult_r(rp[zone][i], u[i - 1]));
-            u[i - 1] = sav;
+            temp = add(_u[i - 1], mult_r(rp[zone][i], di));
+            di = add(di, mult_r(rp[zone][i], _u[i - 1]));
+            _u[i - 1] = sav;
             sav = temp;
         }
         d[k] = di;
@@ -359,7 +366,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // Search of the optimum scaling of d[0..39]
     dmax = 0;
     for (uint16_t k = 0; k <= 39; k++) {
-        temp = abs(d[k]);
+        temp = s_abs(d[k]);
         if (temp > dmax) {
             dmax = temp;
         }
@@ -390,7 +397,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
         L_result = 0;
         for (uint16_t k = 0; k < 40; k++) {
             // NOTE: Index adjustment vs. draft doc
-            L_temp = L_mult(wt[k], dp[(k - lambda) + 120]);
+            L_temp = L_mult(wt[k], _dp[(k - lambda) + 120]);
             L_result = L_add(L_temp, L_result);
         }
         if (L_result > L_max) {
@@ -405,7 +412,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // Initialization of a working array wt[0..39]
     for (uint16_t k = 0; k <= 39; k++) {
         // NOTE: Index adjustment vs. draft doc
-        wt[k] = dp[(k - Nc) + 120] >> 3;
+        wt[k] = _dp[(k - Nc) + 120] >> 3;
     }
 
     // Compute the power of te reconstructed short term residual signal dp[..]
@@ -448,7 +455,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // e[] is the long-term residual signal
     for (uint16_t k = 0; k <= 39; k++) {
         // NOTE: Index adjustment vs. draft doc
-        dpp[k] = mult_r(bp, dp[(k - Nc) + 120]);
+        dpp[k] = mult_r(bp, _dp[(k - Nc) + 120]);
         e[k] = sub(d[k], dpp[k]);
     }
 
@@ -507,7 +514,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
     // Section 5.2.15 - APCM quantization of the selected RPE sequence
     xmax = 0;
     for (uint16_t i = 0; i <= 12; i++) {
-        temp = abs(xM[i]);
+        temp = s_abs(xM[i]);
         if (temp > xmax) {
             xmax = temp;
         }
@@ -592,7 +599,7 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
         ep[Mc + (3 * i)] = xMp[i];
     }
 
-    // Section 5.2.18 - Update of teh reconstructed short term residual
+    // Section 5.2.18 - Update of the reconstructed short term residual
     // signal dp[-120,1].
     for (uint16_t k = 0; k <= 79; k++) {
         // Shift 80 items
@@ -601,13 +608,12 @@ void Encoder::encode(const int16_t sop[], uint8_t out[]) {
         // Second index: -80 -> -1
         //
         // NOTE: Here we have changed the notation from the draft document!
-        dp[(-120 + k) + 120] = dp[(-80 + k) + 120];
+        _dp[(-120 + k) + 120] = _dp[(-80 + k) + 120];
     }
     for (uint16_t k = 0; k <= 39; k++) {
         // NOTE: Here we have changed the notation from the draft document!
-        dp[(-40 + k) + 120] = add(ep[k], dpp[k]);
+        _dp[(-40 + k) + 120] = add(ep[k], dpp[k]);
     }
 }
 
 }
-
