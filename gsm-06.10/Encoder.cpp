@@ -3,9 +3,13 @@
  * 
  * NOT FOR COMMERCIAL USE.
  */
+#include <iostream>
 #include <cassert>
 #include "common.h"
 #include "Encoder.h"
+
+// Utility
+#define q15_to_f32(a) ((float)(a) / 32768.0f)
 
 // Sanity checking function for index bounds
 #define IX(x, lo, hi) (_checkIx(x, lo, hi))
@@ -20,6 +24,8 @@ static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
 
 // See table 5.1 on page 43
 // NOTE: The 0th entry is not used.  The draft uses index [1..8]
+
+// 20480/32767=0.625
 static const int16_t A[9] = { 0, 20480, 20480, 20480, 20480, 13964, 15360, 8534, 9036 };
 static const int16_t B[9] = { 0, 0, 0, 2048, -2560, 94, -1792, -341, -1144 };
 static const int16_t MIC[9] = { 0, -32, -32, -16, -16, -8, -8, -4, -4 };
@@ -93,48 +99,32 @@ void Encoder::reset() {
 */
 void Encoder::encode(const int16_t sop[], Parameters* output) {
 
-    int16_t so[120];
+    int16_t so[160];
+    int16_t sof[160];
+    int16_t s[160];
     int16_t s1 = 0;
     int32_t L_s2;
-    int16_t msp, lsp, exp, mant, xmax, itest;
-    int16_t temp, temp1, temp2, temp3, di, sav, bp, EM, R, S;
-    int16_t sof[120];
-    int16_t s[120];
-    int16_t smax, dmax;
+    int16_t temp, temp1, temp2, temp3, di, sav, bp;
+    int16_t smax;
     int16_t scal, scalauto = 0;
     int32_t L_ACF[9];
-    int32_t L_temp, L_max, L_result, L_power;
     int16_t ACF[9];
     int16_t P[9];
     int16_t r[9];
     int16_t LAR[9];
     int16_t K[9];
-    int16_t LARpp[9];
-    // Here we have four sets of coefficients for different zones
-    // in the segment
-    int16_t LARp[4];
-    int16_t rp[4][9];
-    // This is the short-term residual signal
-    int16_t d[120];
-    int16_t wt[50];
-    int16_t x[40];
-    int16_t dpp[40];
-    // Long-term residual signal
-    int16_t e[40];
-    int16_t ep[40];
-    int16_t xM[13];
-    int16_t xMp[13];
+    int32_t L_temp;
 
     // Section 5.2.1 - Scaling of the input variable
-    for (uint16_t k = 0; k < 120; k++) {
-        // Shift away the 3 low-order (dont' care) bits
+    for (uint16_t k = 0; k <= 159; k++) {
+        // Shift away the 3 low-order (don't care) bits
         so[k] = sop[k] >> 3;
         // Back in q15 format divided by two
         so[k] = so[k] << 2;
     }
 
     // Section 5.2.2 - Offset compensation
-    for (uint16_t k = 0; k < 120; k++) {
+    for (uint16_t k = 0; k <= 159; k++) {
 
         // Compute the non-recursive part
         s1 = sub(so[k], _z1);
@@ -145,9 +135,9 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         L_s2 = L_s2 << 15;
 
         // Execution of a 31 by 16 bit multiplication
-        msp = _L_z2 >> 15;
-        lsp = L_sub(_L_z2, (msp << 15));
-        temp = mult_r(lsp, 32735);
+        int16_t msp = _L_z2 >> 15;
+        int16_t lsp = L_sub(_L_z2, (msp << 15));
+        int16_t temp = mult_r(lsp, 32735);
         L_s2 = L_add(L_s2, temp);
         _L_z2 = L_add(L_mult(msp, 32735) >> 1, L_s2);
 
@@ -156,7 +146,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     }
 
     // Section 5.2.3 - Pre-emphasis
-    for (uint16_t k = 0; k < 120; k++) {
+    for (uint16_t k = 0; k <= 159; k++) {
         s[k] = add(sof[k], mult_r(_mp, -28180));
         _mp = sof[k];
     }
@@ -168,8 +158,8 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // Search for the maximum
     smax = 0;
-    for (uint16_t k = 0; k < 120; k++) {
-        temp = s_abs(s[k]);
+    for (uint16_t k = 0; k <= 159; k++) {
+        int16_t temp = s_abs(s[k]);
         if (temp > smax) {
             smax = temp;
         }
@@ -184,8 +174,8 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // Scaling of the array s[0..159]
     if (scalauto > 0) {
-        temp = 16384 >> sub(scalauto, 1);
-        for (uint16_t k = 0; k < 120; k++) {
+        int16_t temp = 16384 >> sub(scalauto, 1);
+        for (uint16_t k = 0; k <= 159; k++) {
             s[k] = mult_r(s[k], temp);
         }
     }
@@ -193,7 +183,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     // Compute the L_ACF[..]
     for (uint16_t k = 0; k <= 8; k++) {
         L_ACF[k] = 0;
-        for (uint16_t i = k; i < 120; i++) {
+        for (uint16_t i = k; i <= 159; i++) {
             L_temp = L_mult(s[i], s[i - k]);
             L_ACF[k] = L_add(L_ACF[k], L_temp);
         }
@@ -201,7 +191,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // Rescaling of the array s[0..159]
     if (scalauto > 0) {
-        for (uint16_t k = 0; k < 120; k++) {
+        for (uint16_t k = 0; k <= 159; k++) {
             s[k] = s[k] << scalauto;
         }
     }
@@ -215,14 +205,14 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             r[i] = 0;
         }
     } else {
-        temp = norm(L_ACF[0]);
+        int16_t temp = norm(L_ACF[0]);
         for (uint16_t k = 0; k <= 8; k++) {
             ACF[k] = (L_ACF[k] << temp) >> 16;
         }
 
         // Initialize P[] and K[] for the recursion
         for (uint16_t i = 1; i <= 7; i++) {
-            K[9-i] = ACF[i];
+            K[9 - i] = ACF[i];
         }
         for (uint16_t i = 0; i <= 8; i++) {
             P[i] = ACF[i];
@@ -255,63 +245,108 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     }
 
     // 5.2.6 Transformation of reflection coefficients to log-area 
-    // ratios
+    // ratios.
 
-    // Computation of the LAR[1..8] from the r[1..8]
+    // r[1..8] are the reflection coefficients.
+    // LAR[1..8] are the reflection coefficients transformed to 
+    //   log-area ratios "due to favorable quantization characteristics."
+    //
+    // IMPORTANT: LAR[] comes out right-shifted by 1!
     for (uint16_t i = 1; i <= 8; i++) {
-        temp = s_abs(r[i]);
+
+        // The sign of r[i] is removed and added back to the result
+        int16_t temp = s_abs(r[IX(i, 1, 8)]);
+
+        // 22118/32767 = 0.675 threshold
         if (temp < 22118) {
             temp = temp >> 1;
         }
+        // 31130/32767 = 0.95 threshold
         else if (temp < 31130) {
             temp = sub(temp, 11059);
-        } else {
+        } 
+        else {
             temp = sub(temp, 26112) << 2;
         }
-        LAR[i] = temp;
-        if (r[i] < 0) {
-            LAR[i] = sub(0, LAR[i]);
+
+        // Restore sign of result to be consistent with sign of input
+        if (r[IX(i, 1, 8)] < 0) {
+            temp = sub(0, temp);
         }
-    }
+
+        LAR[IX(i, 1, 8)] = temp;
+   }
 
     // Section 5.2.7. - Quantization and coding of the Log-Area Ratios
     int16_t LARc[9];
 
-    // Computation for quantizing and coding the LAR[1..8]
+    // Computation for quantizing and coding the LAR[1..8] 
     // A[], B[] are lookup tables 5.1
+    //
+    // A[] is a scaling factor and B[] is an offset factor.
+    //
+    // LARc[] = nint(A[i] * LAR[i] + B[i])
+    //
+    // Where: nint(z) = int(z + sign(z) * 0.5)
+    //
+    // NUMERICAL ADJUSTMENTS TO REMEMBER:
+    // 1. LAR[] is pre-divided by 2 in the above calculations
+    // 2. A[] is pre-divided by 32 in the lookup table
+    //
     for (uint16_t i = 1; i <= 8; i++) {
-        temp = mult(A[i], LAR[i]);
-        temp = add(temp, B[i]);
-        temp = add(temp, 256);
-        LARc[i] = temp >> 8;
+        
+        // temp is LAR/20 pre-divided by 64 (shifted 6 to the right)
+        int16_t temp = mult(A[IX(i, 1, 8)], LAR[IX(i, 1, 8)]);
+        temp = add(temp, B[IX(i, 1, 8)]);
 
-        // Check if LARc[i] lies between MIN and MAX
-        if (LARc[i] > MAC[i]) {
-            LARc[i] = MAC[i];
-        } else if (LARc[i] < MIC[i]) {
-            LARc[i] = MIC[i];
+        // For rounding
+        temp = add(temp, 256);
+        // Shift an additional 9 to the right, so now we are a total of 15 
+        // to the right.  If we treat this like an normal integer instead of 
+        // a q15 it is equivalent to shifting to the left by 15.
+        LARc[IX(i, 1, 8)] = temp >> 9;
+
+        // Check if LARc[i] lies between MIN and MAX and saturate as needed.
+        if (LARc[IX(i, 1, 8)] > MAC[IX(i, 1, 8)]) {
+            LARc[IX(i, 1, 8)] = MAC[IX(i, 1, 8)];
+        } 
+        if (LARc[IX(i, 1, 8)] < MIC[IX(i, 1, 8)]) {
+            LARc[IX(i, 1, 8)] = MIC[IX(i, 1, 8)];
         }
-        // NOTE: The equation is used to make all of the LARc[i] positive
-        LARc[i] = sub(LARc[i], MIC[i]);
+
+        // The equation is used to make all of the LARc[i] positive
+        // by subtracting the minimum of the range.
+        LARc[IX(i, 1, 8)] = sub(LARc[IX(i, 1, 8)], MIC[IX(i, 1, 8)]);
     }
 
     // Write out the parameters.
     // NOTE: The draft uses index [1..8] for the LARc array
-    for (uint16_t i = 0; i < 8; i++)
-        output->LARc[i]= LARc[i + 1];
+    for (uint16_t i = 0; i < 8; i++) {
+        output->LARc[IX(i, 0, 7)] = LARc[IX(i + 1, 1, 8)];
+    }
 
     // ===== SHORT TERM ANALYSIS FILTERING SECTION ===========================
+
+    int16_t LARpp[9];
+    // Here we have four sets of coefficients for different zones
+    // in the segment
+    int16_t LARp[4];
+    int16_t rp[4][9];
+    // This is the short-term residual signal
+    int16_t d[160];
+    int16_t EM, R, S;
+    int32_t L_max, L_result, L_power;
 
     // Section 5.2.8 - Decoding of the coded Log-Area Ratios
 
     // Compute the LARpp[1..8]
     for (uint16_t i = 1; i <= 8; i++) {
         // NOTE: The addition of MIC[i] is used to restore the sign of LARc[i]
-        temp1 = add(LARc[i], MIC[i]) << 10;
-        temp2 = B[i] << 1;
+        temp1 = add(LARc[IX(i, 1, 8)], MIC[IX(i, 1, 8)]) << 10;
+        temp2 = B[IX(i, 1, 8)] << 1;
         temp1 = sub(temp1, temp2);
-        temp1 = mult_r(INVA[i], temp1);
-        LARpp[i] = add(temp1, temp1);
+        temp1 = mult_r(INVA[IX(i, 1, 8)], temp1);
+        LARpp[IX(i, 1, 8)] = add(temp1, temp1);
     }    
     
     // NOTE: This section is tricky to follow int the documentation
@@ -360,7 +395,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     // sets of rp coefficients.
 
     // Calculate d[] which is the short-term residual
-    for (uint16_t k = 0; k < 120; k++) {
+    for (uint16_t k = 0; k <= 159; k++) {
         uint16_t zone = k2zone(k);
         di = s[k];
         sav = di;
@@ -380,13 +415,22 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     for (uint16_t j = 0; j < 4; j++) {
 
+        int16_t wt[50];
+        int16_t x[40];
+        int16_t dpp[40];
+        // Long-term residual signal
+        int16_t e[40];
+        int16_t ep[40];
+        int16_t xM[13];
+        int16_t xMp[13];
+
         // Compute the starting index
         uint16_t kj = j * 40;
 
         // Section 5.2.11 Calculation of the LTP parameters
 
         // Search of the optimum scaling of d(j)[0..39]
-        dmax = 0;
+        int16_t dmax = 0;
         for (uint16_t k = 0; k <= 39; k++) {        
             // NOTE: Sub-segment index
             temp = s_abs(d[kj + k]);
@@ -483,7 +527,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             // TODO: IS _dp INDEX RIGHT HERE??
             dpp[k] = mult_r(bp, _dp[IX((k - output->subSegs[j].Nc) + 120, 0, 119)]);
             // NOTE: Sub-segment adjustment 
-            e[k] = sub(d[kj + k], dpp[k]);
+            e[IX(k, 0, 39)] = sub(d[kj + k], dpp[k]);
         }
 
         // ===== RPE ENCODING SECTION =============================================
@@ -495,7 +539,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             wt[k] = 0;
         }    
         for (uint16_t k = 5; k <= 44; k++) {
-            wt[k] = e[k-5];
+            wt[k] = e[IX(k - 5, 0, 39)];
         }
         for (uint16_t k = 45; k <= 49; k++) {
             wt[k] = 0;
@@ -539,18 +583,20 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
 
         // Section 5.2.15 - APCM quantization of the selected RPE sequence
-        xmax = 0;
+        uint16_t xmax = 0;
         for (uint16_t i = 0; i <= 12; i++) {
             temp = s_abs(xM[i]);
             if (temp > xmax) {
                 xmax = temp;
             }
         }
+        
+        uint16_t exp, mant;
 
         // Quantizing and coding of xmax to get xmaxc
         exp = 0;
         temp = xmax >> 9;
-        itest = 0;
+        uint16_t itest = 0;
         for (uint16_t i = 0; i <= 5; i++) {
             if (temp <= 0) {
                 itest = 1;
@@ -620,10 +666,10 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         // Section 5.2.17 RPE grid positioning
         // ep[] is the reconstructed long term residual
         for (uint16_t k = 0; k <= 39; k++) {
-            ep[k] = 0;
+            ep[IX(k, 0, 39)] = 0;
         }
         for (uint16_t i = 0; i <= 12; i++) {
-            ep[output->subSegs[j].Mc + (3 * i)] = xMp[i];
+            ep[IX(output->subSegs[j].Mc + (3 * i), 0, 39)] = xMp[i];
         }
     
         // Section 5.2.18 - Update of the reconstructed short term residual
@@ -639,7 +685,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
         for (uint16_t k = 0; k <= 39; k++) {
             // NOTE: Here we have changed the notation from the draft document!
-            _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[k], dpp[k]);
+            _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[IX(k, 0, 39)], dpp[k]);
         }
     }
 }

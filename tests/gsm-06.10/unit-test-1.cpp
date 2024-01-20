@@ -1,13 +1,45 @@
 #include <cassert>
 #include <iostream>
 #include <bitset>
+#include <string>
+#include <fstream>
+
 #include "../../gsm-06.10/common.h"
 #include "../../gsm-06.10/Parameters.h"
 #include "../../gsm-06.10/Encoder.h"
 
+// Utility
+#define q15_to_f32(a) ((float)(a) / 32768.0f)
+
 using namespace radlib;
 
 static void math_tests() {
+
+    {
+        std::cout << q15_to_f32((int16_t)0b1000000000000000) << std::endl;
+        std::cout << q15_to_f32((int16_t)0b1100000000000000) << std::endl;
+        std::cout << q15_to_f32((int16_t)0b0100000000000000) << std::endl;
+    }
+
+    // A quick demo of the quantization used in section 3.1.7. We start with 
+    // a number pre-scaled by 1/64.  An additional 9 shifts allows the 
+    // q15 value to be treated like an integer - works for negatives as well.
+    {
+        // Start with 0.5, which is 32 shifted to the right by 6
+        int16_t a = 16384;
+        // Shift another 9, so the total shift is now 15
+        a = a >> 9;
+        // When we treat this like an integer we should get the 32 back
+        assert(a == 32);
+
+        // Start with -0.5, which is -32 shifted to the right by 6
+        a = -16384;
+        // Shift another 9, so the total shift is now 15
+        a = a >> 9;
+        // When we treat this like an integer we should get the -32 back
+        assert(a == -32);
+    }
+
     // Add with saturation
     {
         // Check overflow cases
@@ -178,18 +210,119 @@ static void math_tests() {
         assert((uint32_t)a == 0b11000000000000000000000000000001);
         assert(norm(a) == 1);
     }
+}
 
+static void make_pcm_file() {
+
+    std::string inp_fn = "../tests/gsm-06.10/data/Seq01.inp";
+    std::ifstream ifile(inp_fn, std::ios::binary);
+    if (!ifile.good()) {
+        return;
+    }
+    
+    std::string out_fn = "c:/tmp/out.txt";
+    std::ofstream ofile(out_fn);
+    if (!ofile.good()) {
+        return;
+    }
+
+    uint32_t sampleCount = 0;
+
+    uint8_t f[2];
+    while (ifile.read((char*)f, 2)) {
+        uint16_t sample = (uint16_t)f[1];
+        sample = sample << 8;
+        sample |= (uint16_t)f[0];
+        // Anything in the low 3?
+        if ((sample & 0b111) != 0) {
+            std::cout << "ERROR" << std::endl;
+            return;
+        }
+        ofile << (int16_t)sample << std::endl;
+        sampleCount++;
+    }
+
+    ifile.close();
+    ofile.close();
+    std::cout << "Convert done " << sampleCount / 160 << std::endl;
+}
+
+static void encoder_tests() {
+
+    // 76 parameters, each coded in 16-bit words
+    assert(sizeof(Parameters) == 76 * 2);
+
+    int16_t input_pcm[160];
+    Parameters expected_params;
+
+    {
+        uint8_t f[160 * 2];
+        std::string inp_fn = "../tests/gsm-06.10/data/Seq01.inp";
+        std::ifstream ifile(inp_fn, std::ios::binary);
+        if (!ifile.good()) {
+            return;
+        }
+        ifile.read((char*)f, 160 * 2);
+        if (!ifile) {
+            std::cout << "error: only " << ifile.gcount() << " could be read";        
+            return;
+        }
+        ifile.close();
+        // Convert the byte-data to 16-bit samples
+        uint16_t p = 0;
+        for (uint16_t i = 0; i < 160; i++) {
+            // MSBs first
+            uint16_t sample = (uint16_t)f[p + 1];
+            sample = sample << 8;
+            sample |= (uint16_t)f[p];
+            input_pcm[i] = sample;
+            p += 2;
+        }
+    }
+
+    {
+        std::string inp_fn = "../tests/gsm-06.10/data/Seq01.cod";
+        std::ifstream ifile(inp_fn, std::ios::binary);
+        if (!ifile.good()) {
+            return;
+        }
+        ifile.read((char*)&expected_params, 76 * 2);
+        if (!ifile) {
+            std::cout << "error: only " << ifile.gcount() << " could be read";        
+            return;
+        }
+        ifile.close();
+    }
+
+    Encoder e;
+    Parameters computed_params;
+    e.encode(input_pcm, &computed_params);
+
+    std::cout << "Expected:" << std::endl;
+    std::cout << expected_params.LARc[0] << std::endl;
+    std::cout << "Got:" << std::endl;
+    std::cout << computed_params.LARc[0] << std::endl;
+
+    std::cout << "Expected:" << std::endl;
+    std::cout << expected_params.LARc[1] << std::endl;
+    std::cout << "Got:" << std::endl;
+    std::cout << computed_params.LARc[1] << std::endl;
+
+    std::cout << "Expected:" << std::endl;
+    std::cout << expected_params.LARc[2] << std::endl;
+    std::cout << "Got:" << std::endl;
+    std::cout << computed_params.LARc[2] << std::endl;
+
+    std::cout << "Expected [3]:" << std::endl;
+    std::cout << expected_params.LARc[3] << std::endl;
+    std::cout << "Got [3]:" << std::endl;
+    std::cout << computed_params.LARc[3] << std::endl;
+
+    assert(computed_params.isEqualTo(expected_params));
 }
 
 int main(int, const char**) {
-    
     math_tests();
-
-    assert(sizeof(Parameters) == 76);
-
-    Encoder e;
-    int16_t input[160];
-    Parameters output;
-    e.encode(input, &output);
-
+    //make_pcm_file();
+    encoder_tests();
 }
