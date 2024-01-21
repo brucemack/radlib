@@ -22,47 +22,7 @@ static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
     return x;
 }
 
-// See table 5.1 on page 43
-// NOTE: The 0th entry is not used.  The draft uses index [1..8]
-
-// This matrix is scaled-down by 32
-// 20480/32767=0.625 which is 20/32
-static const int16_t A[9] = { 0, 20480, 20480, 20480, 20480, 13964, 15360, 8534, 9036 };
-// This matrix is scaled-down by 64
-// 2048/32767=0.0625 which is 4/64
-static const int16_t B[9] = { 0, 0, 0, 2048, -2560, 94, -1792, -341, -1144 };
-static const int16_t MIC[9] = { 0, -32, -32, -16, -16, -8, -8, -4, -4 };
-static const int16_t MAC[9] = { 0, 31, 31, 15, 15, 7, 7, 3, 3 };
-
-// See table 5.2 on page 43
-// This is used to invert the multiplication by A[] above.
-// NOTE: The 0th entry is not used.  The draft uses index [1..8]
-static const int16_t INVA[9] = { 0, 13107, 13107, 13107, 13107, 19223, 17476, 31454, 29708 };
-
-// Table 5.3a: Decision level of the LTP gain quantizer
-// See page 43
-static const int16_t DLB[4] = { 6554, 16384, 26214, 32767 };
-
-// Table 5.3b: Quantization levels of the LTP gain quantizer
-// See page 43
-static const int16_t QLB[4] = { 3277, 11469, 21299, 32767 };
-
-// Table 5.4: Coefficients of the weighting filter
-// See page 43
-static const int16_t H[11] = { -134, -374, 0, 2054, 5741, 8192, 5741, 2054, 0, -374, -134 };
-
-// Table 5.5: Normalized inverse mantissa used to compute xM/xmax
-// See page 44
-static const int16_t NRFAC[8] = { 29128, 26215, 23832, 21846, 20165, 18725, 17476, 16384 };
-
-// Table 5.6: Normalized direct mantissa used to compute xM/xmax
-// See page 44
-static const int16_t FAC[8] = { 18431, 20479, 22527, 24575, 26623, 28671, 30719, 32767 };
-
-/**
- * Converts an index k[0..159] to the zone[0..3] as defined in Table 3.2.
-*/
-static uint16_t k2zone(uint16_t k) {
+uint16_t Encoder::k2zone(uint16_t k) {
     if (k <= 12) {
         return 0;
     } else if (k <= 26) {
@@ -333,21 +293,22 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // ===== SHORT TERM ANALYSIS FILTERING SECTION ===========================
 
+    int16_t rp[4][9];
+
     int16_t LARpp[9];
     // Here we have four sets of coefficients for different zones
     // in the segment
     int16_t LARp[4];
-    int16_t rp[4][9];
 
     // Section 5.2.8 - Decoding of the coded Log-Area Ratios
 
     // Compute the LARpp[1..8] by reversing the LARc[] values
     for (uint16_t i = 1; i <= 8; i++) {
         // NOTE: The addition of MIC[i] is used to restore the sign of LARc[i]
-        temp1 = add(LARc[IX(i, 1, 8)], MIC[IX(i, 1, 8)]) << 10;
+        int16_t temp1 = add(LARc[IX(i, 1, 8)], MIC[IX(i, 1, 8)]) << 10;
         // Remember that B is scaled down twice as much as A, so we need up 
         // shift left to get on equal terms
-        temp2 = B[IX(i, 1, 8)] << 1;
+        int16_t temp2 = B[IX(i, 1, 8)] << 1;
         // Back out B
         temp1 = sub(temp1, temp2);
         // Divide by A 
@@ -355,10 +316,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         // What is this for?
         LARpp[IX(i, 1, 8)] = add(temp1, temp1);
         // IMPORTANT: IT APPEARS THAT WE ARE STILL AT HALF-SCALE of the original r[]
-        //std::cout << i << " " << q15_to_f32(temp1) << " " << q15_to_f32(LARpp[IX(i, 1, 8)]) << std::endl;
     }    
-
-    // NOTE: This section is tricky to follow in the documentation
 
     for (uint16_t i = 1; i <= 8; i++) {
 
@@ -412,7 +370,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             }
         }
     }
-
+   
     // NUMERICAL NOTE: At this point rp[] is back to the original 
     // scale of r[].
 
@@ -420,7 +378,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     for (uint16_t i = 1; i <= 8; i++) {
         _LARpp_last[i] = LARpp[i];
     }
-
+   
     // Section 5.2.10 - Short term analysis filtering
 
     // This is the short-term residual signal that will be computed.
@@ -463,8 +421,6 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         int16_t x[40];
         // Long-term residual signal
         int16_t e[40];
-        int16_t ep[40];
-        int16_t xMp[13];
 
         // Compute the starting index
         uint16_t kj = j * 40;
@@ -644,7 +600,6 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             }
         }
 
-        /* *************************************************************** */
         // Down-sampling by a factor 3 to get the selected xM[0..12] RPE 
         // sequence.
         int16_t xM[13];
@@ -678,11 +633,13 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
         temp = add(exp, 5);
         output->subSegs[j].xmaxc = add((xmax >> temp), (exp << 3));
-
+        
         // Quantizing and coding of the xM[0..12] RPE sequence to get xMc[0..12]
 
-        // Compute exponent and mantissa of teh decoded version of xmaxc
+        // Compute exponent and mantissa of the decoded version of xmaxc
         exp = 0;
+        mant = 0;
+
         if (output->subSegs[j].xmaxc > 15) {
             exp = sub((output->subSegs[j].xmaxc >> 3), 1);    
         }
@@ -721,6 +678,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
 
         // Section 5.2.16 - APCM inverse quantization
+        int16_t xMp[13];
         temp1 = FAC[mant];
         temp2 = sub(6, exp);
         temp3 = 1 << sub(temp2, 1);
@@ -735,6 +693,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
         // Section 5.2.17 RPE grid positioning
         // ep[] is the reconstructed long term residual
+        int16_t ep[40];
         for (uint16_t k = 0; k <= 39; k++) {
             ep[IX(k, 0, 39)] = 0;
         }
@@ -760,7 +719,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             // NOTE: Here we have changed the notation from the draft document!
             _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[IX(k, 0, 39)], dpp[k]);
         }
-    }
+    }   
 }
 
 }
