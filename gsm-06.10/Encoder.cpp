@@ -35,6 +35,7 @@ static const int16_t MIC[9] = { 0, -32, -32, -16, -16, -8, -8, -4, -4 };
 static const int16_t MAC[9] = { 0, 31, 31, 15, 15, 7, 7, 3, 3 };
 
 // See table 5.2 on page 43
+// This is used to invert the multiplication by A[] above.
 // NOTE: The 0th entry is not used.  The draft uses index [1..8]
 static const int16_t INVA[9] = { 0, 13107, 13107, 13107, 13107, 19223, 17476, 31454, 29708 };
 
@@ -411,7 +412,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             }
         }
     }
-    
+
     // NUMERICAL NOTE: At this point rp[] is back to the original 
     // scale of r[].
 

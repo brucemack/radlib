@@ -15,12 +15,6 @@ using namespace radlib;
 
 static void math_tests() {
 
-    {
-        std::cout << q15_to_f32((int16_t)0b1000000000000000) << std::endl;
-        std::cout << q15_to_f32((int16_t)0b1100000000000000) << std::endl;
-        std::cout << q15_to_f32((int16_t)0b0100000000000000) << std::endl;
-    }
-
     // A quick demo of the quantization used in section 3.1.7. We start with 
     // a number pre-scaled by 1/64.  An additional 9 shifts allows the 
     // q15 value to be treated like an integer - works for negatives as well.
@@ -145,17 +139,6 @@ static void math_tests() {
         assert(mult_r(a, b) == 0);
     }
 
-    // Demonstrate that the two kinds of multiplication are different
-    {
-        int16_t a, b, res, res_r;
-        a = 32767 / 2;
-        b = 32767 / 2;
-        // 0.5 x 0.5
-        res = mult(a, b);
-        res_r = mult_r(a, b);
-        std::cout << res << " " << res_r << std::endl;
-    }
-
     // Abs
     {
         assert(s_abs(-32767) == 32767);
@@ -242,6 +225,7 @@ static void math_tests() {
     }
 }
 
+/*
 static void make_pcm_file() {
 
     std::string inp_fn = "../tests/gsm-06.10/data/Seq01.inp";
@@ -276,83 +260,73 @@ static void make_pcm_file() {
     ofile.close();
     std::cout << "Convert done " << sampleCount / 160 << std::endl;
 }
+*/
 
 static void encoder_tests() {
 
     // 76 parameters, each coded in 16-bit words
     assert(sizeof(Parameters) == 76 * 2);
 
-    int16_t input_pcm[160];
-    Parameters expected_params;
+    // This is stateful so we keep it outside of the mail loop
+    Encoder encoder;
+    int segmentCount = 0;
 
-    {
+    std::string inp_fn = "../tests/gsm-06.10/data/Seq01.inp";
+    std::ifstream inp_file(inp_fn, std::ios::binary);
+    if (!inp_file.good()) {
+        assert(false);
+    }
+
+    std::string cod_fn = "../tests/gsm-06.10/data/Seq01.cod";
+    std::ifstream cod_file(cod_fn, std::ios::binary);
+    if (!cod_file.good()) {
+        assert(false);
+    }
+
+    // Read through the files in tandem and compare
+    while (!inp_file.eof() && !cod_file.eof()) {
+
+        // Read a segment of sound and convert it to 16-bit 
         uint8_t f[160 * 2];
-        std::string inp_fn = "../tests/gsm-06.10/data/Seq01.inp";
-        std::ifstream ifile(inp_fn, std::ios::binary);
-        if (!ifile.good()) {
-            return;
+        inp_file.read((char*)f, 160 * 2);
+        if (!inp_file) {
+            break;
         }
-        ifile.read((char*)f, 160 * 2);
-        if (!ifile) {
-            std::cout << "error: only " << ifile.gcount() << " could be read";        
-            return;
-        }
-        ifile.close();
-        // Convert the byte-data to 16-bit samples
+        // NOTE: We are not making any assumptions about Endianness 
+        int16_t inp_pcm[160];
         uint16_t p = 0;
         for (uint16_t i = 0; i < 160; i++) {
-            // MSBs first
+            // LSBs first
             uint16_t sample = (uint16_t)f[p + 1];
             sample = sample << 8;
             sample |= (uint16_t)f[p];
-            input_pcm[i] = sample;
+            inp_pcm[i] = sample;
             p += 2;
         }
+
+        Parameters expected_params;
+        // NOTE: THERE IS AN ENDIANNESS ASSUMPTION HERE!
+        cod_file.read((char*)&expected_params, 76 * 2);
+        if (!cod_file) {
+            break;
+        }
+
+        // Do the encoding and check
+        Parameters computed_params;
+        encoder.encode(inp_pcm, &computed_params);
+
+        assert(computed_params.isEqualTo(expected_params));
+
+        segmentCount++;
     }
 
-    {
-        std::string inp_fn = "../tests/gsm-06.10/data/Seq01.cod";
-        std::ifstream ifile(inp_fn, std::ios::binary);
-        if (!ifile.good()) {
-            return;
-        }
-        ifile.read((char*)&expected_params, 76 * 2);
-        if (!ifile) {
-            std::cout << "error: only " << ifile.gcount() << " could be read";        
-            return;
-        }
-        ifile.close();
-    }
+    assert(segmentCount == 584);
 
-    Encoder e;
-    Parameters computed_params;
-    e.encode(input_pcm, &computed_params);
-
-    std::cout << "Mc" << std::endl;
-
-    std::cout << "Expected:" << std::endl;
-    std::cout << expected_params.subSegs[1].Mc << std::endl;
-    std::cout << "Got:" << std::endl;
-    std::cout << computed_params.subSegs[1].Mc << std::endl;
-
-    std::cout << "xmaxc" << std::endl;
-
-    std::cout << "Expected:" << std::endl;
-    std::cout << expected_params.subSegs[0].xmaxc << std::endl;
-    std::cout << "Got:" << std::endl;
-    std::cout << computed_params.subSegs[0].xmaxc << std::endl;
-
-    std::cout << "Expected:" << std::endl;
-    std::cout << expected_params.subSegs[1].xmaxc << std::endl;
-    std::cout << "Got:" << std::endl;
-    std::cout << computed_params.subSegs[1].xmaxc << std::endl;
-
-
-    assert(computed_params.isEqualTo(expected_params));
+    inp_file.close();
+    cod_file.close();
 }
 
 int main(int, const char**) {
     math_tests();
-    make_pcm_file();
     encoder_tests();
 }
