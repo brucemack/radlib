@@ -50,8 +50,11 @@ int16_t div(int16_t var1, int16_t var2);
  * L_mult is a 32 bit result for the multiplication of var1 times var2 with a one bit shift left.
  * L_mult( var1, var2 ) = ( var1 times var2 ) << 1. The condition L_mult (-32768, -32768 ) does not
  * occur in the [GSM] algorithm.
+ * 
+ * NOTE: This function incorporates multiplication and switching from q15 to q31 in a single
+ * operation.
  */
-int32_t L_mult(int32_t var1, int32_t var2);
+int32_t L_mult(int16_t var1, int16_t var2);
 
 /**
  * 32 bits addition of two 32 bits variables (L_var1 + L_var2) with overflow control and

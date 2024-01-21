@@ -25,8 +25,11 @@ static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
 // See table 5.1 on page 43
 // NOTE: The 0th entry is not used.  The draft uses index [1..8]
 
-// 20480/32767=0.625
+// This matrix is scaled-down by 32
+// 20480/32767=0.625 which is 20/32
 static const int16_t A[9] = { 0, 20480, 20480, 20480, 20480, 13964, 15360, 8534, 9036 };
+// This matrix is scaled-down by 64
+// 2048/32767=0.0625 which is 4/64
 static const int16_t B[9] = { 0, 0, 0, 2048, -2560, 94, -1792, -341, -1144 };
 static const int16_t MIC[9] = { 0, -32, -32, -16, -16, -8, -8, -4, -4 };
 static const int16_t MAC[9] = { 0, 31, 31, 15, 15, 7, 7, 3, 3 };
@@ -104,14 +107,13 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     int16_t s[160];
     int16_t s1 = 0;
     int32_t L_s2;
-    int16_t temp, temp1, temp2, temp3, di, sav, bp;
+    int16_t temp, temp1, temp2, temp3, di, sav;
     int16_t smax;
     int16_t scal, scalauto = 0;
     int32_t L_ACF[9];
     int16_t ACF[9];
     int16_t P[9];
     int16_t r[9];
-    int16_t LAR[9];
     int16_t K[9];
     int32_t L_temp;
 
@@ -245,7 +247,10 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     }
 
     // 5.2.6 Transformation of reflection coefficients to log-area 
-    // ratios.
+    // ratios.  Actually, we use an approximation of the log-area
+    // ratio as defined in the draft spec.
+
+    int16_t LAR[9];
 
     // r[1..8] are the reflection coefficients.
     // LAR[1..8] are the reflection coefficients transformed to 
@@ -332,56 +337,87 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     // in the segment
     int16_t LARp[4];
     int16_t rp[4][9];
-    // This is the short-term residual signal
-    int16_t d[160];
-    int16_t EM, R, S;
-    int32_t L_max, L_result, L_power;
 
     // Section 5.2.8 - Decoding of the coded Log-Area Ratios
 
-    // Compute the LARpp[1..8]
+    // Compute the LARpp[1..8] by reversing the LARc[] values
     for (uint16_t i = 1; i <= 8; i++) {
         // NOTE: The addition of MIC[i] is used to restore the sign of LARc[i]
         temp1 = add(LARc[IX(i, 1, 8)], MIC[IX(i, 1, 8)]) << 10;
+        // Remember that B is scaled down twice as much as A, so we need up 
+        // shift left to get on equal terms
         temp2 = B[IX(i, 1, 8)] << 1;
+        // Back out B
         temp1 = sub(temp1, temp2);
+        // Divide by A 
         temp1 = mult_r(INVA[IX(i, 1, 8)], temp1);
+        // What is this for?
         LARpp[IX(i, 1, 8)] = add(temp1, temp1);
+        // IMPORTANT: IT APPEARS THAT WE ARE STILL AT HALF-SCALE of the original r[]
+        //std::cout << i << " " << q15_to_f32(temp1) << " " << q15_to_f32(LARpp[IX(i, 1, 8)]) << std::endl;
     }    
-    
-    // NOTE: This section is tricky to follow int the documentation
+
+    // NOTE: This section is tricky to follow in the documentation
 
     for (uint16_t i = 1; i <= 8; i++) {
 
         // Section 5.2.9.1 - Interpolation of the LARpp[1..8] to get the LARp[1..8]
+
         // Zone 0
-        LARp[0] = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
-        LARp[0] = add(LARp[0], (_LARpp_last[i] >> 1));
+        int16_t temp = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
+        LARp[0] = add(temp, (_LARpp_last[i] >> 1));
         // Zone 1
         LARp[1] = add((_LARpp_last[i] >> 1), (LARpp[i] >> 1));
         // Zone 2
-        LARp[2] = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
-        LARp[2] = add((LARpp[2]), (LARpp[i] >> 1));
+        temp = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
+        LARp[2] = add(temp, (LARpp[i] >> 1));
         // Zone 3
         LARp[3] = LARpp[i];
 
+        // NUMERICAL NOTE: THE LARp[]s ARE AT 0.5 SCALE HERE
+
         // Section 5.2.9.2 - Computation of the rp[1..8] from the interpolated 
-        // LARp[1..8]
+        // LARp[1..8].  This is the reverse of the simplified log-area 
+        // quantization.
 
         for (uint16_t zone = 0; zone < 4; zone++) {
+            // The sign will be added back later
             temp = s_abs(LARp[zone]);
+            // 11059/32767 = 0.3375 = 0.675/2
             if (temp < 11059) {
+                // NUMERICAL NOTE: The 0.5 scale is removed. 
                 temp = temp << 1;
-            } else if (temp < 20070) {
+            } 
+            // 20070/32767 = 0.6125 = 1.225/2
+            else if (temp < 20070) {
+                // NUMERICAL NOTE: The 0.5 scale is removed. 
                 temp = add(temp, 11059);
-            } else {
+            } 
+            // 26112/32767 ~= 0.796875.  
+            // (NOTE: The approximation appears to be off a bit)
+            else {
+                // NUMERICAL NOTE: The 0.5 scale is removed, and 
+                // before the addition so the coefficient is already
+                // in full scale.
                 temp = add((temp >> 2), 26112);
             }
+
+            // NUMERICAL NOTE: At this point we are at full scale.
             rp[zone][i] = temp;
+
+            // Re-apply the sign if needed
             if (LARp[zone] < 0) {
                 rp[zone][i] = sub(0, rp[zone][i]);
             }
         }
+
+        std::cout << i << " " << q15_to_f32(rp[0][i]) << " "
+                << q15_to_f32(rp[1][i]) << " "
+                << q15_to_f32(rp[2][i]) << " "
+                << q15_to_f32(rp[3][i]) << std::endl;
+
+        // NUMERICAL NOTE: At this point rp[] is back to the original 
+        // scale of r[].
     }
 
     // Once we've used the LARpp_last, copy the new values for next time
@@ -391,18 +427,27 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // Section 5.2.10 - Short term analysis filtering
 
+    // This is the short-term residual signal that will be computed.
+    // We use the original signal s[] and 
+    int16_t d[160];
+
     // NOTE: The zone thing continues here since there are 4 different
     // sets of rp coefficients.
 
-    // Calculate d[] which is the short-term residual
+    // Calculate d[] which is the short-term residual.
+    // _u[0..7] is used to generate the delay during the application 
+    // of the filter.  Notice that _u[7] will be used during the 
+    // processing of the first sample in the next call (i.e. state
+    // be being carried across segments).
+
     for (uint16_t k = 0; k <= 159; k++) {
-        uint16_t zone = k2zone(k);
         di = s[k];
         sav = di;
+        uint16_t zone = k2zone(k);
         for (uint16_t i = 1; i <= 8; i++) {
-            temp = add(_u[i - 1], mult_r(rp[zone][i], di));
-            di = add(di, mult_r(rp[zone][i], _u[i - 1]));
-            _u[i - 1] = sav;
+            temp = add(_u[IX(i - 1, 0, 7)], mult_r(rp[zone][i], di));
+            di = add(di, mult_r(rp[zone][i], _u[IX(i - 1, 0, 7)]));
+            _u[IX(i - 1, 0, 7)] = sav;
             sav = temp;
         }
         d[k] = di;
@@ -415,13 +460,14 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     for (uint16_t j = 0; j < 4; j++) {
 
+        int16_t R, S;
+        int32_t L_max, L_result, L_power;
+
         int16_t wt[50];
         int16_t x[40];
-        int16_t dpp[40];
         // Long-term residual signal
         int16_t e[40];
         int16_t ep[40];
-        int16_t xM[13];
         int16_t xMp[13];
 
         // Compute the starting index
@@ -443,7 +489,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         if (dmax == 0) {
             scal = 0;
         } else {
-            temp = norm(dmax << 16);
+            temp = norm((int32_t)dmax << 16);
         }
         if (temp > 6) {
             scal = 0;
@@ -461,10 +507,11 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         L_max = 0;
         // Index for max cross-corelation
         output->subSegs[j].Nc = 40;    
+
         for (uint16_t lambda = 40; lambda <= 120; lambda++) {
             // Cross correlate with each distinct lag
             L_result = 0;
-            for (uint16_t k = 0; k < 40; k++) {
+            for (uint16_t k = 0; k <= 39; k++) {
                 // NOTE: Index adjustment vs. draft doc
                 L_temp = L_mult(wt[k], _dp[IX((k - lambda) + 120, 0, 119)]);
                 L_result = L_add(L_temp, L_result);
@@ -484,12 +531,14 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             wt[k] = _dp[IX((k - output->subSegs[j].Nc) + 120, 0, 119)] >> 3;
         }
 
-        // Compute the power of te reconstructed short term residual signal dp[..]
+        // Compute the power of the reconstructed short term residual signal dp[..]
         L_power = 0;
         for (uint16_t k = 0; k <= 39; k++) {
             L_temp = L_mult(wt[k], wt[k]);
             L_power = L_add(L_temp, L_power);
         }
+
+        // TODO: UNDERSTAND THE SCALING OF wt[], L_max, and L_power at this point.
 
         // Normalization of L_max and L_power
         if (L_max <= 0) {
@@ -518,23 +567,34 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         // of the estimate of dpp[0..39].
 
         // Decoding of the coded LTP gain
-        bp = QLB[output->subSegs[j].bc];
+        int16_t bp = QLB[output->subSegs[j].bc];
 
         // Calculating the array e[0..39] and the array dpp[0..39]
         // e[] is the long-term residual signal
+        //
+        // The block of 40 long term residual signal samples is obtained by 
+        // subtracting 40 estimates of the short term residual signal 
+        // from the short term residual signal itself.
+        int16_t dpp[40];
         for (uint16_t k = 0; k <= 39; k++) {
             // NOTE: Index adjustment vs. draft doc
-            // TODO: IS _dp INDEX RIGHT HERE??
+            // TODO: MAKE SURE WE ARE COMPARING THE RIGHT THINGS HERE
             dpp[k] = mult_r(bp, _dp[IX((k - output->subSegs[j].Nc) + 120, 0, 119)]);
             // NOTE: Sub-segment adjustment 
             e[IX(k, 0, 39)] = sub(d[kj + k], dpp[k]);
         }
 
         // ===== RPE ENCODING SECTION =============================================
+        //
+        // RPE = "Regular Pulse Excitation"
+        // The input is e[], the long-term residual. The block of 40 input long term 
+        // residual samples are represented by one of 4 candidate sub-sequences of 13 
+        // pulses each. The subsequence selected is identified by the RPE grid position (M).
 
         // Section 5.2.13 - Weighting filter
 
-        // Initialization of a temporary working array wt[0..49]
+        // Initialization of a temporary working array wt[0..49].
+        // The data from e[] is centered in this 50-element array,
         for (uint16_t k = 0; k <= 4; k++) {
             wt[k] = 0;
         }    
@@ -545,45 +605,60 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             wt[k] = 0;
         }
 
-        // Compute the signal x[0..39]
+        // Compute the block-filtered signal x[0..39] via conventional convolution.
+        // Because wt[] has been extended to 50 elements this 
+        // 40x11 convolution results in a 40 element result.
         for (uint16_t k = 0; k <= 39; k++) {
             // Rounding of the output of the filter
             L_result = 8192;
             for (uint16_t i = 0; i <= 10; i++) {
-                L_temp = L_mult(wt[k + i], H[i]);
+                L_temp = L_mult(wt[IX(k + i, 0, 49)], H[IX(i, 0, 10)]);
                 L_result = L_add(L_result, L_temp);
             }
             // Scaling x4
             L_result = L_add(L_result, L_result);
             L_result = L_add(L_result, L_result);
-            x[k] = L_result >> 16;
+            // Drop from 32->16 bits, but we still have the 4x
+            x[IX(k, 0, 39)] = L_result >> 16;
         }
 
+        // In this next section, we take the filtered signal x[] and down-sample it
+        // by a ratio of 3, resulting in 3 interleaved sequences of length 14, 13,
+        // and 13, which are split up again into 4 sub-sequences of length 13.
+
         // Section 5.2.14 - RPE grid selection
-        EM = 0;
+
+        int32_t EM = 0;
         output->subSegs[j].Mc = 0;
 
+        // Figure out what has the maximum energy:
         for (uint16_t m = 0; m <= 3; m++) {
             L_result = 0;
             for (uint16_t i = 0; i <= 12; i++) {
-                temp1 = x[m + (3 * i)] >> 2;
+                // Here the 4x gets removed
+                temp1 = x[IX(m + (3 * i), 0, 39)] >> 2;
+                // Square
                 L_temp = L_mult(temp1, temp1);
                 L_result = L_add(L_temp, L_result);
             }
+            // Is this the max?
             if (L_result > EM) {
                 output->subSegs[j].Mc = m;
                 EM = L_result;
             }
         }
 
+        /* *************************************************************** */
         // Down-sampling by a factor 3 to get the selected xM[0..12] RPE 
         // sequence.
+        int16_t xM[13];
         for (uint16_t i = 0; i <= 12; i++) {
             xM[i] = x[output->subSegs[j].Mc + (3 * i)];
         }
 
         // Section 5.2.15 - APCM quantization of the selected RPE sequence
-        uint16_t xmax = 0;
+
+        int16_t xmax = 0;
         for (uint16_t i = 0; i <= 12; i++) {
             temp = s_abs(xM[i]);
             if (temp > xmax) {
@@ -591,19 +666,18 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             }
         }
         
-        uint16_t exp, mant;
-
         // Quantizing and coding of xmax to get xmaxc
+        int16_t exp, mant;
         exp = 0;
         temp = xmax >> 9;
-        uint16_t itest = 0;
+        int16_t itest = 0;
         for (uint16_t i = 0; i <= 5; i++) {
             if (temp <= 0) {
                 itest = 1;
             }
             temp = temp >> 1;
             if (itest == 0) {
-                exp = add(exp, i);
+                exp = add(exp, 1);
             }
         }
         temp = add(exp, 5);
@@ -681,8 +755,11 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             // Second index: -80 -> -1
             //
             // NOTE: Here we have changed the notation from the draft document!
+            // So we are actually shifting the 80 entries from [40...118] down 
+            // to [0...79].
             _dp[IX((-120 + k) + 120, 0, 119)] = _dp[IX((-80 + k) + 120, 0, 119)];
         }
+        // We are filling in 80 to 119
         for (uint16_t k = 0; k <= 39; k++) {
             // NOTE: Here we have changed the notation from the draft document!
             _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[IX(k, 0, 39)], dpp[k]);

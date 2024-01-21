@@ -72,6 +72,7 @@ int16_t mult_r(int16_t var1, int16_t var2) {
     }
     // Implementation for a 32-bit native system
     int32_t var1_ext = var1, var2_ext = var2;
+    // Add the 0.5 to force a round of the final LSB
     int32_t res = (var1_ext * var2_ext) + 16384;
     return (int16_t)(res >> 15);
 }
@@ -126,9 +127,12 @@ int16_t div(int16_t num, int16_t denum) {
  * L_mult is a 32 bit result for the multiplication of var1 times var2 with a one bit shift left.
  * L_mult( var1, var2 ) = ( var1 times var2 ) << 1. The condition L_mult (-32768, -32768 ) does not
  * occur in the [GSM] algorithm.
+ * 
+ * NOTE: This function incorporates multiplication and switching from q15 to q31 in a single
+ * operation.
  */
-int32_t L_mult(int32_t var1, int32_t var2) {
-    return (var1 * var2) << 1;
+int32_t L_mult(int16_t var1, int16_t var2) {
+    return ((int32_t)var1 * (int32_t)var2) << 1;
 }
 
 /**

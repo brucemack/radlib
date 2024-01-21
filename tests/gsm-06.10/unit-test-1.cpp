@@ -135,8 +135,27 @@ static void math_tests() {
         b = -32768;
         // Should be very close to -1
         assert(mult_r(a, b) == -32767);
+
+        a = 32767;
+        b = 0;
+        assert(mult_r(a, b) == 0);
+
+        a = 32766;
+        b = 0;
+        assert(mult_r(a, b) == 0);
     }
-    
+
+    // Demonstrate that the two kinds of multiplication are different
+    {
+        int16_t a, b, res, res_r;
+        a = 32767 / 2;
+        b = 32767 / 2;
+        // 0.5 x 0.5
+        res = mult(a, b);
+        res_r = mult_r(a, b);
+        std::cout << res << " " << res_r << std::endl;
+    }
+
     // Abs
     {
         assert(s_abs(-32767) == 32767);
@@ -183,6 +202,17 @@ static void math_tests() {
         // We should saturate here
         assert(L_sub(a, b) == a);
     }
+
+    /*
+    // 32-bit multiplication
+    {
+        int32_t a, b;
+        // 0.9999999
+        a = 2147483647;
+        b = 2147483648 / 2;
+        assert(L_mult(a, b) == -2147483648);
+    }
+    */
 
     // Normalization 
     {
@@ -298,31 +328,31 @@ static void encoder_tests() {
     Parameters computed_params;
     e.encode(input_pcm, &computed_params);
 
-    std::cout << "Expected:" << std::endl;
-    std::cout << expected_params.LARc[0] << std::endl;
-    std::cout << "Got:" << std::endl;
-    std::cout << computed_params.LARc[0] << std::endl;
+    std::cout << "Mc" << std::endl;
 
     std::cout << "Expected:" << std::endl;
-    std::cout << expected_params.LARc[1] << std::endl;
+    std::cout << expected_params.subSegs[1].Mc << std::endl;
     std::cout << "Got:" << std::endl;
-    std::cout << computed_params.LARc[1] << std::endl;
+    std::cout << computed_params.subSegs[1].Mc << std::endl;
+
+    std::cout << "xmaxc" << std::endl;
 
     std::cout << "Expected:" << std::endl;
-    std::cout << expected_params.LARc[2] << std::endl;
+    std::cout << expected_params.subSegs[0].xmaxc << std::endl;
     std::cout << "Got:" << std::endl;
-    std::cout << computed_params.LARc[2] << std::endl;
+    std::cout << computed_params.subSegs[0].xmaxc << std::endl;
 
-    std::cout << "Expected [3]:" << std::endl;
-    std::cout << expected_params.LARc[3] << std::endl;
-    std::cout << "Got [3]:" << std::endl;
-    std::cout << computed_params.LARc[3] << std::endl;
+    std::cout << "Expected:" << std::endl;
+    std::cout << expected_params.subSegs[1].xmaxc << std::endl;
+    std::cout << "Got:" << std::endl;
+    std::cout << computed_params.subSegs[1].xmaxc << std::endl;
+
 
     assert(computed_params.isEqualTo(expected_params));
 }
 
 int main(int, const char**) {
     math_tests();
-    //make_pcm_file();
+    make_pcm_file();
     encoder_tests();
 }
