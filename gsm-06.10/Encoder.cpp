@@ -410,15 +410,10 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
                 rp[zone][i] = sub(0, rp[zone][i]);
             }
         }
-
-        std::cout << i << " " << q15_to_f32(rp[0][i]) << " "
-                << q15_to_f32(rp[1][i]) << " "
-                << q15_to_f32(rp[2][i]) << " "
-                << q15_to_f32(rp[3][i]) << std::endl;
-
-        // NUMERICAL NOTE: At this point rp[] is back to the original 
-        // scale of r[].
     }
+    
+    // NUMERICAL NOTE: At this point rp[] is back to the original 
+    // scale of r[].
 
     // Once we've used the LARpp_last, copy the new values for next time
     for (uint16_t i = 1; i <= 8; i++) {
