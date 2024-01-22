@@ -9,18 +9,21 @@
 #include "Encoder.h"
 
 // Utility
-#define q15_to_f32(a) ((float)(a) / 32768.0f)
+//#define q15_to_f32(a) ((float)(a) / 32768.0f)
 
 // Sanity checking function for index bounds
-#define IX(x, lo, hi) (_checkIx(x, lo, hi))
+// USE THIS VERSION FOR DEVELOPMENT/TESTING
+//#define IX(x, lo, hi) (_checkIx(x, lo, hi))
+// USE THIS VERSION FOR PRODUCTION
+#define IX(x, lo, hi) (x)
 
 namespace radlib {
 
 // Sanity checking function for index bounds
-static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
-    assert(x >= lo && x <= hi);
-    return x;
-}
+//static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
+//    assert(x >= lo && x <= hi);
+//    return x;
+//}
 
 uint16_t Encoder::k2zone(uint16_t k) {
     if (k <= 12) {
@@ -70,7 +73,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     int32_t L_s2;
     int16_t temp, temp1, temp2, di, sav;
     int16_t smax;
-    int16_t scal, scalauto = 0;
+    int16_t scal;
     int32_t L_ACF[9];
     int16_t ACF[9];
     int16_t P[9];
@@ -110,6 +113,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // Section 5.2.3 - Pre-emphasis
     for (uint16_t k = 0; k <= 159; k++) {
+        // -28180/32767 = -0.86
         s[k] = add(sof[k], mult_r(_mp, -28180));
         _mp = sof[k];
     }
@@ -129,6 +133,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     }
 
     // Computation of the scaling factor
+    int16_t scalauto = 0;
     if (smax == 0) {
         scalauto = 0;
     } else {

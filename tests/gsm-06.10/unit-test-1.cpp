@@ -11,9 +11,32 @@
 #include "../../gsm-06.10/Decoder.h"
 
 // Utility
-#define q15_to_f32(a) ((float)(a) / 32768.0f)
+//#define q15_to_f32(a) ((float)(a) / 32768.0f)
 
 using namespace radlib;
+
+static void pack_tests() {
+
+    {    
+        PackingState state;
+        uint8_t area[2] = { 0, 0 };
+        // Pack two parameters and make sure they go to the right place
+        Parameters::pack1(area, &state, 0b101, 3);
+        assert(area[0] == 0b00000101);
+        Parameters::pack1(area, &state, 0b01010101, 8);
+        assert(area[0] == 0b10101101);
+        assert(area[1] == 0b00000010);
+    }
+
+    {
+        PackingState state;
+        uint8_t area[33];
+        Parameters parms;
+        parms.pack(area, &state);
+        assert(state.bitsUsed() == 260);
+   }
+
+}
 
 static void math_tests() {
 
@@ -398,7 +421,9 @@ static int decoder_test(const char* baseFn) {
 int main(int, const char**) {
 
     math_tests();
+    pack_tests();
 
+    // Run all tests on DISK #1.  
     assert(encoder_test("../tests/gsm-06.10/data/Seq01") == 584);
     assert(decoder_test("../tests/gsm-06.10/data/Seq01") == 584);
     assert(encoder_test("../tests/gsm-06.10/data/Seq02") == 947);

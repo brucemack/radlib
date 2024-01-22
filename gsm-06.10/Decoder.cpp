@@ -11,18 +11,21 @@
 #include "Decoder.h"
 
 // Utility
-#define q15_to_f32(a) ((float)(a) / 32768.0f)
+//#define q15_to_f32(a) ((float)(a) / 32768.0f)
 
 // Sanity checking function for index bounds
-#define IX(x, lo, hi) (_checkIx(x, lo, hi))
+// USE THIS VERSION FOR DEVELOPMENT/TESTING
+//#define IX(x, lo, hi) (_checkIx(x, lo, hi))
+// USE THIS VERSION FOR PRODUCTION
+#define IX(x, lo, hi) (x)
 
 namespace radlib {
 
 // Sanity checking function for index bounds
-static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
-    assert(x >= lo && x <= hi);
-    return x;
-}
+//static uint16_t _checkIx(uint16_t x, uint16_t lo, uint16_t hi) {
+//    assert(x >= lo && x <= hi);
+//    return x;
+//}
 
 Decoder::Decoder() {
     reset();
