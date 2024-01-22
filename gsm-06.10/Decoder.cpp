@@ -167,46 +167,34 @@ void Decoder::decode(const Parameters* input, int16_t* outputPcm) {
     //
     // This procedure uses the drp[0..39] signal and produces the sr[0...159] 
     // which is the output of the short-term synthesis filter.
+    //
+    // We also take the chance to perform the post-processing on the
+    // output samples.
 
-    int16_t sr[160];
-
-    // See figure 3.5 on page 26 
     for (int16_t k = 0; k <= 159; k++) {
+        // Remember that the filter coefficients change as we move across 
+        // the segment.  IMPORTANT: ZONE != SUB-SEGMENT!!
         int16_t zone = Encoder::k2zone(k);
+        // See figure 3.5 on page 26 
         int16_t sri = wt[k];
         for (int16_t i = 1; i <= 8; i++) {
             sri = sub(sri, mult_r(rrp[zone][IX(9 - i, 1, 8)], _v[IX(8 - i, 0, 7)]));
             // Moving forward on _v[]
             _v[IX(9 - i, 1, 8)] = add(_v[IX(8 - i, 0, 7)], mult_r(rrp[zone][IX(9 - i, 1, 8)], sri));
         }
-        sr[k] = sri;
         _v[0] = sri;
-    }
 
-    // TODO: COLLAPSE ALL OF THESE LOOPS
-
-    // Section 5.3.5 - Deemphasis filtering
-    int16_t sro[160];
-    for (int16_t k = 0; k <= 159; k++) {
+        // Section 5.3.5 - Deemphasis filtering
         // 28180/32767 = 0.86
-        int16_t temp = add(sr[k], mult_r(_msr, 28180));
+        //int16_t temp = add(sr[k], mult_r(_msr, 28180));
+        int16_t temp = add(sri, mult_r(_msr, 28180));
         _msr = temp;
-        sro[k] = _msr;
-    }
 
-    // Section 5.3.6 - Upscaling of the output signal
-    int16_t srop[160];
-    for (int16_t k = 0; k <= 159; k++) {
-        // TODO: UNDERSTAND DIFFERENCE BETWEEN THIS AND SHIFT
-        srop[k] = add(sro[k], sro[k]);
-        //outputPcm[k] = srop[k] & 0xfff8;
-    }
+        // Section 5.3.6 - Up-scaling of the output signal
+        int16_t srop = add(_msr, _msr);
 
-    // Section 5.3.7 - Truncation of the output variable
-    for (int16_t k = 0; k <= 159; k++) {
-        srop[k] = srop[k] >> 3;
-        srop[k] = srop[k] << 3;
-        outputPcm[k] = srop[k];
+        // Section 5.3.7 - Truncation of the output variable
+        outputPcm[k] = srop & 0xfff8;
     }
 }
 
