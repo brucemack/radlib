@@ -18,9 +18,8 @@ public:
     uint16_t bitPtr;
     uint16_t bytePtr;
 
-    uint16_t bitsUsed() const {
-        return (bytePtr * 8) + bitPtr;
-    }
+    uint16_t bitsUsed() const;
+    void reset();
 };
 
 /**
@@ -44,7 +43,8 @@ public:
      * Packs the sub-segment parameters into the specified area.
      * Please see table 1.1 on page 11 for full information.
     */
-    void pack(uint8_t* packArea, PackingState* state) const;
+    void pack(uint8_t* stream, PackingState* streamState) const;
+    void unpack(const uint8_t* stream, PackingState* streamState);
 };
 
 /**
@@ -61,9 +61,20 @@ public:
 
     bool isEqualTo(const Parameters& other) const;
     void pack(uint8_t* packArea, PackingState* state) const;
+    void unpack(const uint8_t* stream, PackingState* streamState);
 
-    static void pack1(uint8_t* packArea, PackingState* state, uint16_t parameter, 
+    /**
+     * Packs one parameter to the specified stream.
+     * NOTE: Only works for parameters <= 8 bits (as needed)
+     */
+    static void pack1(uint8_t* stream, PackingState* streamState, uint16_t parameter, 
         uint16_t bits);
+
+    /**
+     * Unpacks one parameter from the specified stream.
+     * NOTE: Only works for parameters <= 8 bits (as needed)
+     */
+    static uint8_t unpack1(const uint8_t* stream, PackingState* streamState, uint16_t bits);
 };
 
 }    

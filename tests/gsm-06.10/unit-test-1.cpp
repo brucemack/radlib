@@ -26,6 +26,12 @@ static void pack_tests() {
         Parameters::pack1(area, &state, 0b01010101, 8);
         assert(area[0] == 0b10101101);
         assert(area[1] == 0b00000010);
+        
+        state.reset();
+        assert(Parameters::unpack1(area, &state, 3) == 0b101);
+        uint8_t x = Parameters::unpack1(area, &state, 8);
+        std::cout << (uint16_t)x << std::endl;
+        assert(x == 0b01010101);
     }
 
     {
@@ -33,6 +39,10 @@ static void pack_tests() {
         uint8_t area[33];
         Parameters parms;
         parms.pack(area, &state);
+        assert(state.bitsUsed() == 260);
+
+        state.reset();
+        parms.unpack(area, &state);
         assert(state.bitsUsed() == 260);
    }
 

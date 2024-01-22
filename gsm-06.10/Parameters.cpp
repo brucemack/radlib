@@ -9,6 +9,15 @@ PackingState::PackingState()
     bytePtr(0) {
 }
 
+uint16_t PackingState::bitsUsed() const {
+    return (bytePtr * 8) + bitPtr;
+}
+
+void PackingState::reset() {
+    bitPtr = 0;
+    bytePtr = 0;
+}
+
 bool SubSegParameters::isEqualTo(const SubSegParameters& other) const {
     return Nc == other.Nc &&
         bc == other.bc &&
@@ -43,6 +52,17 @@ void SubSegParameters::pack(uint8_t* packArea, PackingState* state) const {
     }
 }
 
+void SubSegParameters::unpack(const uint8_t* stream, PackingState* streamState) {        
+    Nc = Parameters::unpack1(stream, streamState, 7);
+    bc = Parameters::unpack1(stream, streamState, 2);
+    Mc = Parameters::unpack1(stream, streamState, 2);
+    xmaxc = Parameters::unpack1(stream, streamState, 6);
+    for (uint16_t i = 0; i < 13; i++) {
+        xMc[i] = Parameters::unpack1(stream, streamState, 3);
+    }
+}
+
+
 bool Parameters::isEqualTo(const Parameters& other) const {
     return 
         LARc[0] == other.LARc[0] &&
@@ -74,6 +94,21 @@ void Parameters::pack(uint8_t* packArea, PackingState* state) const {
     subSegs[3].pack(packArea, state);
 }
 
+void Parameters::unpack(const uint8_t* packArea, PackingState* state) {        
+    LARc[0] = unpack1(packArea, state, 6);
+    LARc[1] = unpack1(packArea, state, 6);
+    LARc[2] = unpack1(packArea, state, 5);
+    LARc[3] = unpack1(packArea, state, 5);
+    LARc[4] = unpack1(packArea, state, 4);
+    LARc[5] = unpack1(packArea, state, 4);
+    LARc[6] = unpack1(packArea, state, 3);
+    LARc[7] = unpack1(packArea, state, 3);
+    subSegs[0].unpack(packArea, state);
+    subSegs[1].unpack(packArea, state);
+    subSegs[2].unpack(packArea, state);
+    subSegs[3].unpack(packArea, state);
+}
+
 void Parameters::pack1(uint8_t* packArea, PackingState* state, uint16_t parameter, 
     uint16_t bits) {
     uint8_t work = (uint8_t)(parameter & 0xff);
@@ -91,6 +126,22 @@ void Parameters::pack1(uint8_t* packArea, PackingState* state, uint16_t paramete
             state->bitPtr = 0;
         }
     }
+}
+
+uint8_t Parameters::unpack1(const uint8_t* stream, PackingState* streamState, uint16_t bits) {
+    uint8_t work = 0;
+    for (uint16_t b = 0; b < bits; b++) {
+        if (stream[streamState->bytePtr] & MASKS[streamState->bitPtr]) {
+            work |= MASKS[b];
+        }
+        streamState->bitPtr++;
+        // Look for the wrap to the next byte
+        if (streamState->bitPtr == 8) {
+            streamState->bytePtr++;
+            streamState->bitPtr = 0;
+        }
+    }
+    return work;
 }
 
 }
