@@ -5,7 +5,7 @@
  */
 #include <iostream>
 #include <cassert>
-#include "common.h"
+#include "fixed_math.h"
 
 #include "Encoder.h"
 #include "Decoder.h"

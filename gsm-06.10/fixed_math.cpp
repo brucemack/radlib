@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-#include "common.h"
+#include "fixed_math.h"
 
 namespace radlib {
 

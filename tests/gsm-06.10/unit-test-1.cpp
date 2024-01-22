@@ -5,10 +5,11 @@
 #include <fstream>
 #include <cstring>
 
-#include "../../gsm-06.10/common.h"
+#include "../../gsm-06.10/fixed_math.h"
 #include "../../gsm-06.10/Parameters.h"
 #include "../../gsm-06.10/Encoder.h"
 #include "../../gsm-06.10/Decoder.h"
+#include "../../gsm-06.10/wav_util.h"
 
 // Utility
 //#define q15_to_f32(a) ((float)(a) / 32768.0f)
@@ -30,7 +31,6 @@ static void pack_tests() {
         state.reset();
         assert(Parameters::unpack1(area, &state, 3) == 0b101);
         uint8_t x = Parameters::unpack1(area, &state, 8);
-        std::cout << (uint16_t)x << std::endl;
         assert(x == 0b01010101);
     }
 
@@ -297,6 +297,49 @@ static void make_pcm_file() {
 }
 */
 
+static void test_wav(const char* inFn, const char* outFn) {
+
+    std::string inp_fn = inFn;
+    std::ifstream inp_file(inp_fn, std::ios::binary);
+    if (!inp_file.good()) {
+        assert(false);
+    }
+
+    int16_t pcmData[160 * 2048];
+    uint32_t pcmPtr = 0;
+
+    // Read through the files in tandem and compare
+    while (!inp_file.eof()) {
+
+        // Read a segment of sound and convert it to 16-bit 
+        uint8_t f[1024];
+        inp_file.read((char*)f, 160 * 2);
+        int r = inp_file.gcount() / 2;
+        // NOTE: We are not making any assumptions about Endianness 
+        uint16_t p = 0;
+        for (uint16_t i = 0; i < r; i++) {
+            // LSBs first
+            uint16_t sample = (uint16_t)f[p + 1];
+            sample = sample << 8;
+            sample |= (uint16_t)f[p];
+            pcmData[pcmPtr++] = sample;
+            p += 2;
+        }
+    }
+
+    inp_file.close();
+
+    std::ofstream out_file(outFn, std::ios::binary);
+    if (!out_file.good()) {
+        assert(false);
+    }
+
+    encodeFromPCM16((const int16_t*)pcmData, pcmPtr, out_file, 8000);
+
+    out_file.close();
+
+}
+
 static int encoder_test(const char* baseFn) {
 
     // 76 parameters, each coded in 16-bit words
@@ -444,4 +487,10 @@ int main(int, const char**) {
     assert(decoder_test("../tests/gsm-06.10/data/Seq04") == 520);
     // Decoder-only test
     assert(decoder_test("../tests/gsm-06.10/data/Seq05") == 64);
+
+    // Make some .WAV files 
+    test_wav("../tests/gsm-06.10/data/Seq01.inp", "../tests/gsm-06.10/data/Seq01.wav");
+    test_wav("../tests/gsm-06.10/data/Seq02.inp", "../tests/gsm-06.10/data/Seq02.wav");
+    test_wav("../tests/gsm-06.10/data/Seq03.inp", "../tests/gsm-06.10/data/Seq03.wav");
+    test_wav("../tests/gsm-06.10/data/Seq04.inp", "../tests/gsm-06.10/data/Seq04.wav");
 }
