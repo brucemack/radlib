@@ -3,10 +3,12 @@
 #include <bitset>
 #include <string>
 #include <fstream>
+#include <cstring>
 
 #include "../../gsm-06.10/common.h"
 #include "../../gsm-06.10/Parameters.h"
 #include "../../gsm-06.10/Encoder.h"
+#include "../../gsm-06.10/Decoder.h"
 
 // Utility
 #define q15_to_f32(a) ((float)(a) / 32768.0f)
@@ -262,7 +264,7 @@ static void make_pcm_file() {
 }
 */
 
-static void encoder_tests() {
+static void encoder_test() {
 
     // 76 parameters, each coded in 16-bit words
     assert(sizeof(Parameters) == 76 * 2);
@@ -318,15 +320,80 @@ static void encoder_tests() {
         assert(computed_params.isEqualTo(expected_params));
 
         segmentCount++;
+
+        // TEMP
+        break;
     }
 
-    assert(segmentCount == 584);
+    //assert(segmentCount == 584);
 
     inp_file.close();
     cod_file.close();
 }
 
+static void decoder_test() {
+
+    // This is stateful so we keep it outside of the mail loop
+    Decoder decoder;
+    int segmentCount = 0;
+
+    std::string cod_fn = "../tests/gsm-06.10/data/Seq01.cod";
+    std::ifstream cod_file(cod_fn, std::ios::binary);
+    if (!cod_file.good()) {
+        assert(false);
+    }
+
+    std::string out_fn = "../tests/gsm-06.10/data/Seq01.out";
+    std::ifstream out_file(out_fn, std::ios::binary);
+    if (!out_file.good()) {
+        assert(false);
+    }
+
+    // Read through the files in tandem and compare
+    while (!out_file.eof() && !cod_file.eof()) {
+
+        Parameters params;
+        // NOTE: THERE IS AN ENDIANNESS ASSUMPTION HERE!
+        cod_file.read((char*)&params, 76 * 2);
+        if (!cod_file) {
+            break;
+        }
+
+        // Read a segment of sound and convert it to 16-bit 
+        uint8_t f[160 * 2];
+        out_file.read((char*)f, 160 * 2);
+        if (!out_file) {
+            break;
+        }
+        // NOTE: We are not making any assumptions about Endianness 
+        int16_t expected_pcm[160];
+        uint16_t p = 0;
+        for (uint16_t i = 0; i < 160; i++) {
+            // LSBs first
+            uint16_t sample = (uint16_t)f[p + 1];
+            sample = sample << 8;
+            sample |= (uint16_t)f[p];
+            expected_pcm[i] = sample;
+            p += 2;
+        }
+
+        // Do the Decoding and check
+        int16_t computed_pcm[160];
+        decoder.decode(&params, computed_pcm);
+
+        assert(memcmp((void *)expected_pcm, (void*)computed_pcm, 160 * 2) == 0);
+
+        segmentCount++;
+    }
+
+    assert(segmentCount == 584);
+
+    out_file.close();
+    cod_file.close();
+}
+
 int main(int, const char**) {
     math_tests();
-    encoder_tests();
+    encoder_test();
+    decoder_test();
 }

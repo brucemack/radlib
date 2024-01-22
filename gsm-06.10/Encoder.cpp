@@ -293,102 +293,32 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
     // ===== SHORT TERM ANALYSIS FILTERING SECTION ===========================
 
+    // Section 5.2.8 - Decoding of the coded Log-Area Ratios.  
+    // This basically reverses the process above to create the r' version
+    // of the reflection coefficients.  These will also be used on the 
+    // decoder side.
+
+    // We get one set of reflection coefficients for each zone.
+    // The coefficients are in rp[0..3][1..8].
+
     int16_t rp[4][9];
+    decodeReflectionCoefficients(output, _LARpp_last, rp);
 
-    int16_t LARpp[9];
-    // Here we have four sets of coefficients for different zones
-    // in the segment
-    int16_t LARp[4];
-
-    // Section 5.2.8 - Decoding of the coded Log-Area Ratios
-
-    // Compute the LARpp[1..8] by reversing the LARc[] values
-    for (uint16_t i = 1; i <= 8; i++) {
-        // NOTE: The addition of MIC[i] is used to restore the sign of LARc[i]
-        int16_t temp1 = add(LARc[IX(i, 1, 8)], MIC[IX(i, 1, 8)]) << 10;
-        // Remember that B is scaled down twice as much as A, so we need up 
-        // shift left to get on equal terms
-        int16_t temp2 = B[IX(i, 1, 8)] << 1;
-        // Back out B
-        temp1 = sub(temp1, temp2);
-        // Divide by A 
-        temp1 = mult_r(INVA[IX(i, 1, 8)], temp1);
-        // What is this for?
-        LARpp[IX(i, 1, 8)] = add(temp1, temp1);
-        // IMPORTANT: IT APPEARS THAT WE ARE STILL AT HALF-SCALE of the original r[]
-    }    
-
-    for (uint16_t i = 1; i <= 8; i++) {
-
-        // Section 5.2.9.1 - Interpolation of the LARpp[1..8] to get the LARp[1..8]
-
-        // Zone 0
-        int16_t temp = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
-        LARp[0] = add(temp, (_LARpp_last[i] >> 1));
-        // Zone 1
-        LARp[1] = add((_LARpp_last[i] >> 1), (LARpp[i] >> 1));
-        // Zone 2
-        temp = add((_LARpp_last[i] >> 2), (LARpp[i] >> 2));
-        LARp[2] = add(temp, (LARpp[i] >> 1));
-        // Zone 3
-        LARp[3] = LARpp[i];
-
-        // NUMERICAL NOTE: THE LARp[]s ARE AT 0.5 SCALE HERE
-
-        // Section 5.2.9.2 - Computation of the rp[1..8] from the interpolated 
-        // LARp[1..8].  This is the reverse of the simplified log-area 
-        // quantization.
-
-        for (uint16_t zone = 0; zone < 4; zone++) {
-            // The sign will be added back later
-            temp = s_abs(LARp[zone]);
-            // 11059/32767 = 0.3375 = 0.675/2
-            if (temp < 11059) {
-                // NUMERICAL NOTE: The 0.5 scale is removed. 
-                temp = temp << 1;
-            } 
-            // 20070/32767 = 0.6125 = 1.225/2
-            else if (temp < 20070) {
-                // NUMERICAL NOTE: The 0.5 scale is removed. 
-                temp = add(temp, 11059);
-            } 
-            // 26112/32767 ~= 0.796875.  
-            // (NOTE: The approximation appears to be off a bit)
-            else {
-                // NUMERICAL NOTE: The 0.5 scale is removed, and 
-                // before the addition so the coefficient is already
-                // in full scale.
-                temp = add((temp >> 2), 26112);
-            }
-
-            // NUMERICAL NOTE: At this point we are at full scale.
-            rp[zone][i] = temp;
-
-            // Re-apply the sign if needed
-            if (LARp[zone] < 0) {
-                rp[zone][i] = sub(0, rp[zone][i]);
-            }
-        }
-    }
-   
     // NUMERICAL NOTE: At this point rp[] is back to the original 
     // scale of r[].
 
-    // Once we've used the LARpp_last, copy the new values for next time
-    for (uint16_t i = 1; i <= 8; i++) {
-        _LARpp_last[i] = LARpp[i];
-    }
-   
     // Section 5.2.10 - Short term analysis filtering
 
     // This is the short-term residual signal that will be computed.
-    // We use the original signal s[] and 
+    // We use the original signal s[] and the INVERSE of the filter
+    // that is defined by the coefficients in r'.
     int16_t d[160];
 
     // NOTE: The zone thing continues here since there are 4 different
     // sets of rp coefficients.
 
     // Calculate d[] which is the short-term residual.
+    //
     // _u[0..7] is used to generate the delay during the application 
     // of the filter.  Notice that _u[7] will be used during the 
     // processing of the first sample in the next call (i.e. state
@@ -419,7 +349,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
         int16_t wt[50];
         int16_t x[40];
-        // Long-term residual signal
+        // Long-term residual signal calculated from d - d''
         int16_t e[40];
 
         // Compute the starting index
@@ -515,14 +445,17 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
 
         // Section 5.2.12 - Long term analysis filtering
+        //
         // In this part we have to decode the bc parameter to compute the samples
         // of the estimate of dpp[0..39].
 
         // Decoding of the coded LTP gain
         int16_t bp = QLB[output->subSegs[j].bc];
-
+        
         // Calculating the array e[0..39] and the array dpp[0..39]
-        // e[] is the long-term residual signal
+        //
+        // e[] is the long-term residual signal and is defined as 
+        // e = d - d''
         //
         // The block of 40 long term residual signal samples is obtained by 
         // subtracting 40 estimates of the short term residual signal 
@@ -543,7 +476,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         // residual samples are represented by one of 4 candidate sub-sequences of 13 
         // pulses each. The subsequence selected is identified by the RPE grid position (M).
 
-        // Section 5.2.13 - Weighting filter
+        // Section 5.2.13 - Weighting filter H(z)
 
         // Initialization of a temporary working array wt[0..49].
         // The data from e[] is centered in this 50-element array,
@@ -602,12 +535,19 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
 
         // Down-sampling by a factor 3 to get the selected xM[0..12] RPE 
         // sequence.
+        // 
+        // Basically, we are pulling a 13-point pulse xM[] out of the 
+        // x[] signal which will be used to represent the entire x[] signal.
+        // This is where the "RPE" term comes from.  We represent x[] 
+        // by a repeated use of the pulse in xM[].
+
         int16_t xM[13];
         for (uint16_t i = 0; i <= 12; i++) {
             xM[i] = x[output->subSegs[j].Mc + (3 * i)];
         }
 
-        // Section 5.2.15 - APCM quantization of the selected RPE sequence
+        // Section 5.2.15 - APCM quantization of the selected RPE sequence.
+        // APCM = Adaptive pulse-coded modulation.
 
         int16_t xmax = 0;
         for (uint16_t i = 0; i <= 12; i++) {
@@ -692,7 +632,10 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
 
         // Section 5.2.17 RPE grid positioning
-        // ep[] is the reconstructed long term residual
+        // ep[] is the reconstructed long term residual.  The array starts
+        // off with all zeroes and then the pulse values are interspersed
+        // based on the Mc index that was determined by the RPE selection (Mc).
+
         int16_t ep[40];
         for (uint16_t k = 0; k <= 39; k++) {
             ep[IX(k, 0, 39)] = 0;
@@ -700,7 +643,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         for (uint16_t i = 0; i <= 12; i++) {
             ep[IX(output->subSegs[j].Mc + (3 * i), 0, 39)] = xMp[i];
         }
-    
+
         // Section 5.2.18 - Update of the reconstructed short term residual
         // signal dp[-120,1].
         for (uint16_t k = 0; k <= 79; k++) {
@@ -715,11 +658,100 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             _dp[IX((-120 + k) + 120, 0, 119)] = _dp[IX((-80 + k) + 120, 0, 119)];
         }
         // We are filling in 80 to 119
+        // d' = d'' + e'
         for (uint16_t k = 0; k <= 39; k++) {
             // NOTE: Here we have changed the notation from the draft document!
             _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[IX(k, 0, 39)], dpp[k]);
         }
     }   
+}
+
+void Encoder::decodeReflectionCoefficients(const Parameters* params, 
+    int16_t* LARpp_last, int16_t rp[][9]) {
+
+    int16_t LARpp[9];
+    // Here we have four sets of coefficients for different zones
+    // in the segment
+    int16_t LARp[4];
+
+    // Section 5.2.8 - Decoding of the coded Log-Area Ratios
+
+    // Compute the LARpp[1..8] by reversing the LARc[] values
+    for (uint16_t i = 1; i <= 8; i++) {
+        // NOTE: The addition of MIC[i] is used to restore the sign of LARc[i]
+        int16_t temp1 = add(params->LARc[IX(i - 1, 0, 7)], MIC[IX(i, 1, 8)]) << 10;
+        // Remember that B is scaled down twice as much as A, so we need up 
+        // shift left to get on equal terms
+        int16_t temp2 = B[IX(i, 1, 8)] << 1;
+        // Back out B
+        temp1 = sub(temp1, temp2);
+        // Divide by A 
+        temp1 = mult_r(INVA[IX(i, 1, 8)], temp1);
+        // What is this for?
+        LARpp[IX(i, 1, 8)] = add(temp1, temp1);
+        // IMPORTANT: IT APPEARS THAT WE ARE STILL AT HALF-SCALE of the original r[]
+    }    
+
+    for (uint16_t i = 1; i <= 8; i++) {
+
+        // Section 5.2.9.1 - Interpolation of the LARpp[1..8] to get the LARp[1..8]
+
+        // Zone 0
+        int16_t temp = add((LARpp_last[i] >> 2), (LARpp[i] >> 2));
+        LARp[0] = add(temp, (LARpp_last[i] >> 1));
+        // Zone 1
+        LARp[1] = add((LARpp_last[i] >> 1), (LARpp[i] >> 1));
+        // Zone 2
+        temp = add((LARpp_last[i] >> 2), (LARpp[i] >> 2));
+        LARp[2] = add(temp, (LARpp[i] >> 1));
+        // Zone 3
+        LARp[3] = LARpp[i];
+
+        // NUMERICAL NOTE: THE LARp[]s ARE AT 0.5 SCALE HERE
+
+        // Section 5.2.9.2 - Computation of the rp[1..8] from the interpolated 
+        // LARp[1..8].  This is the reverse of the simplified log-area 
+        // quantization.
+
+        for (uint16_t zone = 0; zone < 4; zone++) {
+            // The sign will be added back later
+            temp = s_abs(LARp[zone]);
+            // 11059/32767 = 0.3375 = 0.675/2
+            if (temp < 11059) {
+                // NUMERICAL NOTE: The 0.5 scale is removed. 
+                temp = temp << 1;
+            } 
+            // 20070/32767 = 0.6125 = 1.225/2
+            else if (temp < 20070) {
+                // NUMERICAL NOTE: The 0.5 scale is removed. 
+                temp = add(temp, 11059);
+            } 
+            // 26112/32767 ~= 0.796875.  
+            // (NOTE: The approximation appears to be off a bit)
+            else {
+                // NUMERICAL NOTE: The 0.5 scale is removed, and 
+                // before the addition so the coefficient is already
+                // in full scale.
+                temp = add((temp >> 2), 26112);
+            }
+
+            // NUMERICAL NOTE: At this point we are at full scale.
+            rp[zone][i] = temp;
+
+            // Re-apply the sign if needed
+            if (LARp[zone] < 0) {
+                rp[zone][i] = sub(0, rp[zone][i]);
+            }
+        }
+    }
+
+    // NUMERICAL NOTE: At this point rp[] is back to the original 
+    // scale of r[].
+
+    // Once we've used the LARpp_last, copy the new values for next time
+    for (uint16_t i = 1; i <= 8; i++) {
+        LARpp_last[i] = LARpp[i];
+    }
 }
 
 }
