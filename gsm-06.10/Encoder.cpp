@@ -54,9 +54,9 @@ void Encoder::reset() {
 }
 
 /**
- * Please see https://www.etsi.org/deliver/etsi_en/300900_300999/300961/06.01.00_40/en_300961v060100o.pdf 
+ * Please see https://www.etsi.org/deliver/etsi_EN/300900_300999/300961/08.00.01_40/en_300961v080001o.pdf
  * for the source specification that was used for this CODEC.  References to page/section numbers
- * are taken from that specific version of the document (Draft ETSI EN 300 961 V6.1.0 (2000-07)).
+ * are taken from that specific version of the document Draft "ETSI EN 300 961 V8.0.1 (2000-07).""
  * 
  * Variable names from the draft are preserved, even when they violate common C++ coding
  * conventions.
@@ -68,7 +68,7 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
     int16_t s[160];
     int16_t s1 = 0;
     int32_t L_s2;
-    int16_t temp, temp1, temp2, temp3, di, sav;
+    int16_t temp, temp1, temp2, di, sav;
     int16_t smax;
     int16_t scal, scalauto = 0;
     int32_t L_ACF[9];
@@ -618,31 +618,9 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
         }
 
         // Section 5.2.16 - APCM inverse quantization
-        int16_t xMp[13];
-        temp1 = FAC[mant];
-        temp2 = sub(6, exp);
-        temp3 = 1 << sub(temp2, 1);
-        for (uint16_t i = 0; i <= 12; i++) {
-            // This subtraction is used to restore the sign of xMc[i]
-            temp = sub((output->subSegs[j].xMc[i] << 1), 7);
-            temp = temp << 12;
-            temp = mult_r(temp1, temp);
-            temp = add(temp, temp3);
-            xMp[i] = temp >> temp2;
-        }
-
         // Section 5.2.17 RPE grid positioning
-        // ep[] is the reconstructed long term residual.  The array starts
-        // off with all zeroes and then the pulse values are interspersed
-        // based on the Mc index that was determined by the RPE selection (Mc).
-
         int16_t ep[40];
-        for (uint16_t k = 0; k <= 39; k++) {
-            ep[IX(k, 0, 39)] = 0;
-        }
-        for (uint16_t i = 0; i <= 12; i++) {
-            ep[IX(output->subSegs[j].Mc + (3 * i), 0, 39)] = xMp[i];
-        }
+        inverseAPCM(output, j, exp, mant, ep);
 
         // Section 5.2.18 - Update of the reconstructed short term residual
         // signal dp[-120,1].
@@ -664,6 +642,35 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[IX(k, 0, 39)], dpp[k]);
         }
     }   
+}
+
+void Encoder::inverseAPCM(const Parameters* params, int16_t j, int16_t exp, int16_t mant, int16_t ep[]) {
+
+    // Section 5.2.16 - APCM inverse quantization
+    int16_t xMp[13];
+    int16_t temp;
+    int16_t temp1 = FAC[mant];
+    int16_t temp2 = sub(6, exp);
+    int16_t temp3 = 1 << sub(temp2, 1);
+    for (uint16_t i = 0; i <= 12; i++) {
+        // This subtraction is used to restore the sign of xMc[i]
+        temp = sub((params->subSegs[j].xMc[i] << 1), 7);
+        temp = temp << 12;
+        temp = mult_r(temp1, temp);
+        temp = add(temp, temp3);
+        xMp[i] = temp >> temp2;
+    }
+
+    // Section 5.2.17 RPE grid positioning
+    // ep[] is the reconstructed long term residual.  The array starts
+    // off with all zeroes and then the pulse values are interspersed
+    // based on the Mc index that was determined by the RPE selection (Mc).
+    for (uint16_t k = 0; k <= 39; k++) {
+        ep[IX(k, 0, 39)] = 0;
+    }
+    for (uint16_t i = 0; i <= 12; i++) {
+        ep[IX(params->subSegs[j].Mc + (3 * i), 0, 39)] = xMp[i];
+    }
 }
 
 void Encoder::decodeReflectionCoefficients(const Parameters* params, 

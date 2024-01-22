@@ -44,14 +44,13 @@ void Decoder::reset() {
 
 void Decoder::decode(const Parameters* input, int16_t* outputPcm) {
 
+    // This will be filled one sub-segment at a time.  It is 
+    // essentially the dr' signal for each sub-segment.
     int16_t wt[160];
 
     // This part runs four times, once for each sub-segment.  In keeping with 
     // the draft convention, we use "j" to denote the sub-segment.
-
     for (uint16_t j = 0; j < 4; j++) {
-
-        int16_t temp, temp1, temp2, temp3;
 
         // Section 5.3.1 - RPE Decoding 
         // The goal here is to reconstruct the long-term residual erp[0..39] signal
@@ -88,35 +87,10 @@ void Decoder::decode(const Parameters* input, int16_t* outputPcm) {
         }
         mant = sub(mant, 8);
 
-        // ****** exp/mant compare works ********
-
         // Encoder Section 5.2.16 - APCM inverse quantization
-        int16_t xMp[13];
-        temp1 = Encoder::FAC[mant];
-        temp2 = sub(6, exp);
-        temp3 = 1 << sub(temp2, 1);
-        for (int16_t i = 0; i <= 12; i++) {
-            // This subtraction is used to restore the sign of xMc[i]
-            temp = sub((input->subSegs[j].xMc[i] << 1), 7);
-            temp = temp << 12;
-            temp = mult_r(temp1, temp);
-            temp = add(temp, temp3);
-            xMp[i] = temp >> temp2;
-        }
-
-        // ****** xMp compare works *********
-
         // Encoder Section 5.2.17 RPE grid positioning
-        // ep[] is the reconstructed long term residual
         int16_t erp[40];
-        for (int16_t k = 0; k <= 39; k++) {
-            erp[IX(k, 0, 39)] = 0;
-        }
-        for (int16_t i = 0; i <= 12; i++) {
-            erp[IX(input->subSegs[j].Mc + (3 * i), 0, 39)] = xMp[i];
-        }
-
-        // ****** ep[] vs erp[] compare is good ******* 
+        Encoder::inverseAPCM(input, j, exp, mant, erp);
 
         // Section 5.3.2 - Long-Term Synthesis Filtering
         // Use bc abd Nc to realize the long-term synthesis filtering
@@ -131,8 +105,6 @@ void Decoder::decode(const Parameters* input, int16_t* outputPcm) {
 
         // Decoding of the LTP gain bc
         int16_t brp = Encoder::QLB[input->subSegs[j].bc];
-
-        /* ******* brp matches bp ******* */
 
         // Computation of the reconstructed short term residual signal drp[0..39]
         for (int16_t k = 0; k <= 39; k++) {

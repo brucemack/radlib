@@ -64,9 +64,16 @@ public:
     /**
      * Reconstructs the reflection coefficients in rp[] from the parameters. Uses
      * and updates LRPpp_last in the process.
-    */
+     */
     static void decodeReflectionCoefficients(const Parameters* params, 
         int16_t* LARpp_last, int16_t rp[][9]);
+
+    /**
+     * Reverses the APCM coding of a pulse.
+     * 
+     * @params j The sub-segment number [0..3]
+     */
+    static void inverseAPCM(const Parameters* params, int16_t j, int16_t exp, int16_t mant, int16_t xMp[]);
 
 private:
 
