@@ -264,7 +264,7 @@ static void make_pcm_file() {
 }
 */
 
-static void encoder_test() {
+static int encoder_test(const char* baseFn) {
 
     // 76 parameters, each coded in 16-bit words
     assert(sizeof(Parameters) == 76 * 2);
@@ -273,13 +273,15 @@ static void encoder_test() {
     Encoder encoder;
     int segmentCount = 0;
 
-    std::string inp_fn = "../tests/gsm-06.10/data/Seq01.inp";
+    std::string inp_fn = baseFn;
+    inp_fn += ".inp";
     std::ifstream inp_file(inp_fn, std::ios::binary);
     if (!inp_file.good()) {
         assert(false);
     }
 
-    std::string cod_fn = "../tests/gsm-06.10/data/Seq01.cod";
+    std::string cod_fn = baseFn;
+    cod_fn += ".cod";
     std::ifstream cod_file(cod_fn, std::ios::binary);
     if (!cod_file.good()) {
         assert(false);
@@ -320,30 +322,31 @@ static void encoder_test() {
         assert(computed_params.isEqualTo(expected_params));
 
         segmentCount++;
-
-        // TEMP
-        break;
     }
 
     //assert(segmentCount == 584);
 
     inp_file.close();
     cod_file.close();
+
+    return segmentCount;
 }
 
-static void decoder_test() {
+static int decoder_test(const char* baseFn) {
 
     // This is stateful so we keep it outside of the mail loop
     Decoder decoder;
     int segmentCount = 0;
 
-    std::string cod_fn = "../tests/gsm-06.10/data/Seq01.cod";
+    std::string cod_fn = baseFn;
+    cod_fn += ".cod";
     std::ifstream cod_file(cod_fn, std::ios::binary);
     if (!cod_file.good()) {
         assert(false);
     }
 
-    std::string out_fn = "../tests/gsm-06.10/data/Seq01.out";
+    std::string out_fn = baseFn;
+    out_fn += ".out";
     std::ifstream out_file(out_fn, std::ios::binary);
     if (!out_file.good()) {
         assert(false);
@@ -386,14 +389,24 @@ static void decoder_test() {
         segmentCount++;
     }
 
-    assert(segmentCount == 584);
-
     out_file.close();
     cod_file.close();
+
+    return segmentCount;
 }
 
 int main(int, const char**) {
+
     math_tests();
-    encoder_test();
-    decoder_test();
+
+    assert(encoder_test("../tests/gsm-06.10/data/Seq01") == 584);
+    assert(decoder_test("../tests/gsm-06.10/data/Seq01") == 584);
+    assert(encoder_test("../tests/gsm-06.10/data/Seq02") == 947);
+    assert(decoder_test("../tests/gsm-06.10/data/Seq02") == 947);
+    assert(encoder_test("../tests/gsm-06.10/data/Seq03") == 673);
+    assert(decoder_test("../tests/gsm-06.10/data/Seq03") == 673);
+    assert(encoder_test("../tests/gsm-06.10/data/Seq04") == 520);
+    assert(decoder_test("../tests/gsm-06.10/data/Seq04") == 520);
+    // Decoder-only test
+    assert(decoder_test("../tests/gsm-06.10/data/Seq05") == 64);
 }
