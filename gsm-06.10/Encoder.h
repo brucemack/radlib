@@ -57,8 +57,17 @@ public:
      */
     static uint16_t k2zone(uint16_t k);
 
-    Encoder();
+    Encoder(bool homingSupported = true);
+    
+    /**
+     * Sets the encoder back to the "home" state.
+     */
     void reset();
+
+    /**
+     * Encodes a 160-sample frame and returns the parameters.
+     * IMPORTANT: THE CALLER MUST ENSURE THAT inputPcm[] CONTAINS 160 SAMPLES.
+    */
     void encode(const int16_t inputPcm[], Parameters* out);
 
     /**
@@ -75,8 +84,19 @@ public:
      */
     static void inverseAPCM(const Parameters* params, int16_t j, int16_t exp, int16_t mant, int16_t xMp[]);
 
+    /**
+     * Determines whether the frame is an Encoder Homing Frame.
+     * 
+     * The encoder-homing-frame consists of 160 identical samples, each 13 bits long, with the least
+     * significant bit set to "one" and all other bits set to "zero". When written to 16-bit words 
+     * with left justification, the samples have a value of 0008 hex
+     */
+    static bool isHomingFrame(const int16_t frame[]);
+
 private:
 
+    bool _homingSupported;
+    bool _lastFrameHome;
     // State preserved between segments
     int16_t _z1;
     int32_t _L_z2;

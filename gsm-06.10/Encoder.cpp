@@ -37,7 +37,9 @@ uint16_t Encoder::k2zone(uint16_t k) {
     }
 }
 
-Encoder::Encoder() {
+Encoder::Encoder(bool homingSupported) 
+:   _homingSupported(homingSupported),
+    _lastFrameHome(false) {
     reset();
 }
 
@@ -647,6 +649,23 @@ void Encoder::encode(const int16_t sop[], Parameters* output) {
             _dp[IX((-40 + k) + 120, 0, 119)] = add(ep[IX(k, 0, 39)], dpp[k]);
         }
     }   
+
+    // Look at the original input frame to determine if it is a homing frame
+    if (_homingSupported) {
+        if (isHomingFrame(sop)) {
+            reset();
+            _lastFrameHome = true;
+        }
+    }
+}
+
+bool Encoder::isHomingFrame(const int16_t frame[]) {
+    for (uint16_t i = 0; i < 160; i++) {
+        if (frame[i] != 1) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void Encoder::inverseAPCM(const Parameters* params, int16_t j, int16_t exp, int16_t mant, int16_t ep[]) {

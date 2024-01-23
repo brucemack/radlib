@@ -60,7 +60,17 @@ public:
     SubSegParameters subSegs[4];
 
     bool isEqualTo(const Parameters& other) const;
-    void pack(uint8_t* packArea, PackingState* state) const;
+    
+    /**
+     * This function will write 33 bytes of the stream area, so the caller 
+     * is responsible for making sure that space is available.
+    */
+    void pack(uint8_t* stream, PackingState* streamState) const;
+
+    /**
+     * This function will read 33 bytes of the stream area, so the caller
+     * is responsible for making sure that the space is available.
+     */    
     void unpack(const uint8_t* stream, PackingState* streamState);
 
     /**
