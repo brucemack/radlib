@@ -17,7 +17,10 @@ namespace radlib {
 void encodeFromPCM16(const int16_t pcm[], uint32_t samples, std::ostream& str, 
     uint16_t samplesPerSecond);
 
-void decodeToPCM16(std::istream& str, uint16_t pcm[], uint32_t maxSamples);
+/**
+ * @returns Negative number for error, otherwise the number of samples read.
+ */
+int decodeToPCM16(std::istream& str, int16_t pcm[], uint32_t maxSamples);
 
 }
 

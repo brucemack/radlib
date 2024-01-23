@@ -471,10 +471,7 @@ static int decoder_test(const char* baseFn) {
     return segmentCount;
 }
 
-int main(int, const char**) {
-
-    math_tests();
-    pack_tests();
+static void etsi_test_files() {
 
     // Run all tests on DISK #1.  
     assert(encoder_test("../tests/gsm-06.10/data/Seq01") == 584);
@@ -493,4 +490,50 @@ int main(int, const char**) {
     test_wav("../tests/gsm-06.10/data/Seq02.inp", "../tests/gsm-06.10/data/Seq02.wav");
     test_wav("../tests/gsm-06.10/data/Seq03.inp", "../tests/gsm-06.10/data/Seq03.wav");
     test_wav("../tests/gsm-06.10/data/Seq04.inp", "../tests/gsm-06.10/data/Seq04.wav");
+}
+
+int main(int, const char**) {
+
+    math_tests();
+    pack_tests();
+    etsi_test_files();
+
+    {   
+        std::string inp_fn = "../tests/gsm-06.10/data/male-1.wav";
+        std::string out_fn = "../tests/gsm-06.10/data/male-1-out.wav";
+
+        const uint32_t in_pcm_max = 160 * 1024;
+        int16_t in_pcm[in_pcm_max];
+
+        std::ifstream inp_file(inp_fn, std::ios::binary);
+        if (!inp_file.good()) {
+            assert(false);
+        }
+        int samples = decodeToPCM16(inp_file, in_pcm, in_pcm_max);
+        inp_file.close();
+
+        uint16_t segments = samples / 160;
+
+        Encoder encoder;
+        Decoder decoder;
+
+        int16_t out_pcm[160 * 1024];
+
+        for (uint16_t segment = 0; segment < segments; segment++) {
+
+            // Do the encoding 
+            Parameters params;
+            encoder.encode(&(in_pcm[segment * 160]), &params);
+
+            // Do the decoding
+            decoder.decode(&params, &(out_pcm[segment * 160]));
+        }
+
+        std::ofstream out_file(out_fn, std::ios::binary);
+        if (!out_file.good()) {
+            assert(false);
+        }
+        encodeFromPCM16(out_pcm, samples, out_file, 8000);
+        out_file.close();
+    }
 }

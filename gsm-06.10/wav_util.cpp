@@ -1,4 +1,6 @@
 #include <cstdint>
+#include <cstring>
+
 #include "wav_util.h"
 
 using namespace std;
@@ -31,6 +33,30 @@ static void write16LE(ostream& str, uint16_t i) {
     str.write((char*)&b, 1);
 }
 
+static uint32_t read32LE(istream& str) {
+    uint32_t result;
+    uint8_t b[4];
+    str.read((char*)b, 4);
+    result = b[3];
+    result <<= 8;
+    result |= b[2];
+    result <<= 8;
+    result |= b[1];
+    result <<= 8;
+    result |= b[0];
+    return result;
+}
+
+static uint16_t read16LE(istream& str) {
+    uint16_t result;
+    uint8_t b[2];
+    str.read((char*)b, 2);
+    result = b[1];
+    result <<= 8;
+    result |= b[0];
+    return result;
+}
+
 /**
  * Here is a decent reference: http://soundfile.sapp.org/doc/WaveFormat/
  */
@@ -47,6 +73,7 @@ void encodeFromPCM16(const int16_t pcm[], uint32_t samples, std::ostream& str,
     uint32_t i32;
 
     str.write("fmt ", 4);
+
     // Sub Chunk 1 size
     i32 = 16;
     write32LE(str, i32);
@@ -83,6 +110,73 @@ void encodeFromPCM16(const int16_t pcm[], uint32_t samples, std::ostream& str,
     for (uint32_t i = 0; i < samples; i++) {
         write16LE(str, pcm[i]);
     }   
+}
+
+int decodeToPCM16(std::istream& str, int16_t pcm[], uint32_t maxSamples) {
+
+    char buf[4];
+    // RIFF
+    str.read(buf, 4);
+    if (!memcmp(buf, "RIFF", 4) == 0) {
+        return -1;
+    }
+
+    uint32_t totalLen = read32LE(str);
+
+    // WAVE
+    str.read(buf, 4);
+    if (!memcmp(buf, "WAVE", 4) == 0) {
+        return -1;
+    }
+
+    // fmt
+    str.read(buf, 4);
+    if (!memcmp(buf, "fmt ", 4) == 0) {
+        return -1;
+    }
+
+    // Sub Chunk 1 size
+    uint32_t subChunkSize1 = read32LE(str);
+
+    // Format
+    uint16_t format = read16LE(str);
+    if (format != 1) {
+        std::cout << "Format " << format << std::endl;
+        return -2;
+    }
+
+    // Channels
+    uint16_t channels = read16LE(str);
+    if (channels != 1) {
+        return -3;
+    }
+
+    uint32_t sampleRate = read32LE(str);
+    uint32_t byteRate = read32LE(str);
+    uint16_t blockAlign = read16LE(str);
+    uint16_t bitsPerSample = read16LE(str);
+    if (bitsPerSample != 16) {
+        return -4;
+    }
+
+    // data
+    str.read(buf, 4);
+    if (!memcmp(buf, "data", 4) == 0) {
+        return -1;
+    }
+
+    uint32_t bytes = read32LE(str);
+    uint32_t samples = bytes / 2;
+
+    for (uint32_t i = 0; i < samples && i < maxSamples; i++) {
+        pcm[i] = read16LE(str);
+    }
+
+    if (samples > maxSamples) {
+        return maxSamples;
+    } else {
+        return samples;        
+    }
 }
 
 }
