@@ -39,6 +39,11 @@ namespace radlib {
 class F32FFT {
 public:
 
+    /**
+     * @param trigTableSpace A work-area of size n that will be filled with 
+     * trig values during construction to avoid needing to compute them on
+     * every call to transform().
+     */
     F32FFT(uint16_t n, float* trigTableSpace);
 
     /**

@@ -2,6 +2,12 @@
 
 namespace radlib {
 
+void mult_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n) {
+    for (unsigned int i = 0; i < n; i++) {
+        p[i] = a[i].mult(b[i]);
+    }
+}
+
 uint16_t incAndWrap(uint16_t i, uint16_t size) {
     uint16_t result = i + 1;
     if (result == size) {
@@ -23,6 +29,13 @@ static const float PI = std::atan(1.0) * 4.0;
 
 float pi() {
     return PI;
+}
+
+void convertf32cf32(uint16_t n, float* realData, cf32* complexData) {
+    for (uint16_t i = 0; i < n; i++) {
+        complexData[i].r = realData[i];
+        complexData[i].i = 0;
+    }
 }
 
 void visit_real_tone(uint32_t len, float sample_freq_hz, float tone_freq_hz,
