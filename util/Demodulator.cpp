@@ -80,7 +80,7 @@ static const float h_lpf_33[] = {
 
 Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2fftN,
     q15* fftTrigTable, q15* fftWindow,
-    cq15* fftResultSpace, q15* bufferSpace)
+    cq15* fftResultSpace, q15* bufferSpace, uint16_t maxSampleN)
 :   _sampleFreq(sampleFreq),
     _fftN(1 << log2fftN),
     _log2fftN(log2fftN),
@@ -88,7 +88,12 @@ Demodulator::Demodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2
     _fftWindow(fftWindow),
     _fftResult(fftResultSpace),
     _fft(_fftN, fftTrigTable),
-    _buffer(bufferSpace) { 
+    _buffer(bufferSpace),
+    _maxSampleN(maxSampleN),
+    _maxSampleAcc(0),
+    _maxSample(0),
+    _posCountAcc(0),
+    _posCount(0) { 
 
     // Build the Hann window for the FFT (raised cosine) if a space has 
     // been provided for it.
@@ -129,6 +134,10 @@ void Demodulator::setFrequencyLock(float lockedMarkHz) {
 void Demodulator::reset() {
     _frequencyLocked = false;
     _clearCorrelationHistory();
+    _maxSample = 0;
+    _maxSampleAcc = 0;
+    _posCountAcc = 0;
+    _posCount = 0;
 }
 
 void Demodulator::processSample(q15 sample) {
@@ -138,8 +147,29 @@ void Demodulator::processSample(q15 sample) {
     // Remember where the reading starts
     const uint16_t readBufferPtr = _bufferPtr;
     // Increment the write pointer and wrap if needed
-    _bufferPtr = (_bufferPtr + 1) % _fftN;
+    if (++_bufferPtr == _fftN) {
+        _bufferPtr = 0;
+    }
     _sampleCount++;
+
+    // Deal with the max sample tracker
+    if (sample >= _maxSampleAcc) {
+        _maxSampleAcc = sample;
+    }
+    // Deal with the positive sample tracker
+    if (sample > 0) {
+        _posCountAcc += 1;
+    } else if (sample < 0) {
+        _posCountAcc -= 1;
+    }
+    // Resets
+    if (++_maxSampleCtr == _maxSampleN) {
+        _maxSample = _maxSampleAcc;
+        _maxSampleAcc = 0;
+        _posCount = _posCountAcc;
+        _posCountAcc = 0;
+        _maxSampleCtr = 0;
+    }
 
     // Did we just finish a new block?  If so, run the FFT
     if (_bufferPtr % _blockSize == 0) {

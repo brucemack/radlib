@@ -30,12 +30,22 @@ namespace radlib {
  * This contains all of the RTTY demodulator logic.  This is a stateful
  * object that will be called once every sample interval with the latest
  * available sample.
+ *
+ * From: http://ac4m.us/RTTY.html
+ *
+ * The lower RF frequency is known as the SPACE frequency and the upper 
+ * RF frequency is known as the MARK frequency. The difference between 
+ * the two is known as the SHIFT. For amateur radio, the SHIFT has been 
+ * standardized at 170 Hz. It is customary to refer to the MARK 
+ * frequency as the frequency you are operating on. For example, if you
+ * say you are transmitting on 14080.00 kHz, that means your MARK 
+ * frequency is 14080.00 kHz and your SPACE frequency is 170 Hz lower, 
+ * or 14079.83 kHz. 
  */
 class RTTYDemodulator : public Demodulator {
 public:
 
-    RTTYDemodulator(uint16_t sampleFreq, uint16_t lowestFreq,
-        uint16_t log2fftN,
+    RTTYDemodulator(uint16_t sampleFreq, uint16_t lowestFreq, uint16_t log2fftN,
         q15* fftTrigTableSpace, q15* fftWindowSpace, cq15* fftResultSpace, 
         q15* bufferSpace);
 
@@ -44,6 +54,7 @@ public:
     virtual void reset();
 
     uint32_t getSampleCount() const { return _decoder.getSampleCount(); }
+
     uint32_t getInvalidSampleCount() const { return _decoder.getInvalidSampleCount(); }
 
 protected:

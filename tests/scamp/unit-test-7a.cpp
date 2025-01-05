@@ -84,7 +84,7 @@ int main(int, const char**) {
     // Note that we have applied random noise to the signal to ensure that 
     // this doesn't create a problem.
     TestModem2 modem2(samples, S, sampleFreq, 
-        markFreq + tuningErrorHz, spaceFreq + tuningErrorHz, 0.3, 0.1, 0.1);
+        markFreq + tuningErrorHz, spaceFreq + tuningErrorHz, 0.2, 0.1, 0.1);
 
     const char* testMessage1 = "DE KC1FSZ, GOOD MORNING";
     const char* testMessage2 = "73S, HAVE A GOOD DAY";
@@ -154,12 +154,12 @@ int main(int, const char**) {
             demod.processSample(sample);
         }
 
-        cout << "FRAMES  : " << demod.getFrameCount() << endl;
-        cout << "PLL INT : " << demod.getPLLIntegration() << endl;
-        cout << "PLL ERR : " << 100.0f * demod.getClockRecoveryPhaseError() << " %" << endl;
-        cout << "LAST DC : " << demod.getLastDCPower() << endl;
-        cout << "MARK HZ : " << demod.getMarkFreq() << endl;
-        cout << "MESSAGE : " << testListener.getMessage() << endl;
+        cout << "FRAMES     : " << demod.getFrameCount() << endl;
+        cout << "PLL INT    : " << demod.getPLLIntegration() << endl;
+        cout << "PLL ERR    : " << 100.0f * demod.getClockRecoveryPhaseError() << " %" << endl;
+        cout << "LAST DC    : " << demod.getLastDCPower() << endl;
+        cout << "MARK HZ    : " << demod.getMarkFreq() << endl;
+        cout << "MESSAGE    : " << testListener.getMessage() << endl;
         //assertm(testListener.getMessage() == "DE KC1FSZ, GOOD MORNING73S, HAVE A GOOD DAY", 
         //    "Message Failure");
 

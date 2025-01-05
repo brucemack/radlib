@@ -34,10 +34,17 @@ namespace radlib {
 class Demodulator {
 public:
 
+    /**
+     * @param maxSampleN Controls how many samples are used to maintain the 
+     *   "maximum sample value."  This feature is useful for tuning the 
+     *   gain on the receiver.
+    */
+
     Demodulator(uint16_t sampleFreq, uint16_t lowestFreq,
         uint16_t log2fftN,
         q15* fftTrigTableSpace, q15* fftWindowSpace, cq15* fftResultSpace, 
-        q15* bufferSpace);
+        q15* bufferSpace,
+        uint16_t maxSampleN = 512);
 
     virtual void setListener(DemodulatorListener* listener) { _listener = listener; };
 
@@ -69,15 +76,27 @@ public:
 
     void setAutoLockEnabled(bool en) { _autoLockEnabled = en; }
 
-    //int32_t getPLLIntegration() const;
+    float getMarkFreq() const;
 
     float getLastDCPower() const { return _lastDCPower; };
 
-    float getMarkFreq() const;
-    
-    float getDetectionCorrelationThreshold() const {
-        return _detectionCorrelationThreshold;
-    }
+    /**
+     * This is a statistical function that is useful for tuning the receiver
+     * gain.
+     * 
+     * @return The maximum sample value seen over the window defined by the  
+     *   maxSampleN parameter passed to the constructor.
+     */    
+    q15 getMaxSample() const { return _maxSample; }
+
+    /**
+     * This is a statistical function that is useful for tuning the receiver
+     * DC bias and gain.
+     * 
+     * @return The number of above zero samples seen over the window defined by the  
+     *   maxSampleN parameter passed to the constructor.
+     */    
+    uint16_t getPosCount() const { return _posCount; }
 
     /**
      * Sets the threshold value that determines whether a symbol is being 
@@ -86,6 +105,8 @@ public:
     void setDetectionCorrelationThreshold(float t) {
         _detectionCorrelationThreshold = t;
     }
+
+    float getDetectionCorrelationThreshold() const { return _detectionCorrelationThreshold; }
 
 protected:
 
@@ -174,6 +195,15 @@ private:
 
     float _detectionCorrelationThreshold = 0;
     float _lastCorrDiff = 0;
+
+    const uint16_t _maxSampleN;
+    uint16_t _maxSampleCtr;
+    q15 _maxSampleAcc = 0;
+    q15 _maxSample = 0;
+    // Used to keep track of the number of samples above zero.
+    // This is helpful for adjusting DC bias.
+    int16_t _posCountAcc = 0;
+    int16_t _posCount = 0;
 };
 
 }
