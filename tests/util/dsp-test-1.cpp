@@ -13,6 +13,7 @@ static bool float_close(float a, float b) {
     return (std::abs(a - b) / b) < 0.01;
 }
 
+// Some basic sanity checks of real and complex signals.
 static void test_set_1() {
     
     const uint32_t N = 64;
@@ -47,7 +48,7 @@ static void test_set_1() {
     // DFT should only result in the positive frequency
     fft.transform(sigC);
     // Positive freq
-    maxBin = maxMagIdx(sigC, 0, N / 2);
+    maxBin = maxMagIdx(sigC, 0, N);
     assert(maxBin == 2);
     // All of the power is in the positive bin
     assert(float_close(1.0, sigC[maxBin].mag()));
@@ -76,7 +77,7 @@ static void test_set_1() {
         // DFT should only result in the positive frequency
         fft.transform(sig3C);
         // Positive freq
-        maxBin = maxMagIdx(sig3C, 0, N / 2);
+        maxBin = maxMagIdx(sig3C, 0, N);
         assert(maxBin == 2);
         // All of the power is in the positive bin
         assert(float_close(1.0, sig3C[maxBin].mag()));
@@ -101,7 +102,7 @@ static void test_set_1() {
         // DFT should only result in the positive frequency
         fft.transform(sig3C);
         // Positive freq
-        maxBin = maxMagIdx(sig3C, 0, N / 2);
+        maxBin = maxMagIdx(sig3C, 0, N);
         assert(maxBin == 2);
         // All of the power is in the positive bin
         assert(float_close(1.0, sig3C[maxBin].mag()));
@@ -112,8 +113,70 @@ static void test_set_1() {
             assert(sig3C[i].mag() < 0.0001);
         }
     }
+
+    // Two tones (analytic).  Show that the DFTs are independent.
+    {
+        cf32 sig1C[N];
+        make_complex_tone_cf32(sig1C, N, sample_freq, 2000, 1.0);
+        cf32 sig2C[N];
+        make_complex_tone_cf32(sig2C, N, sample_freq, 5000, 0.5);
+        cf32 sig3C[N];
+        add_complex(sig3C, sig1C, sig2C, N);
+
+        // DFT should see both
+        fft.transform(sig3C);
+        // Positive freq
+        maxBin = maxMagIdx(sig3C, 0, N);
+        assert(maxBin == 2);
+        // All of the power is in the positive bin
+        // The signals don't impact each other
+        assert(float_close(1.0, sig3C[maxBin].mag()));
+    }
+
+    // Two tone test (analytic).  Down-convert and see some negative components.
+    {
+        cf32 sig1C[N];
+        make_complex_tone_cf32(sig1C, N, sample_freq, 2000, 1.0);
+        cf32 sig2C[N];
+        make_complex_tone_cf32(sig2C, N, sample_freq, 5000, 0.5);
+        cf32 sig3C[N];
+        add_complex(sig3C, sig1C, sig2C, N);
+
+        // The down conversion carrier
+        cf32 sig4C[N];
+        make_complex_tone_cf32(sig4C, N, sample_freq, -3000, 1.0);
+
+        // We expect 1.0 at -1000 Hz and 0.5 at +2000 Hz
+        cf32 sig5C[N];
+        mult_complex(sig5C, sig3C, sig4C, N);
+
+        fft.transform(sig5C);
+        // Positive freq
+        maxBin = maxMagIdx(sig5C, 0, N);
+        // This is the -1 bin
+        assert(maxBin == 63);
+        // All of the power is in the positive bin
+        // The signals don't impact each other
+        assert(float_close(1.0, sig5C[maxBin].mag()));
+    }
+}
+
+static void test_set_2() {
+    
+    const uint32_t N = 64;
+    const float sample_freq = 64000;
+    const float tone_freq = 2000;
+    float trig_area[N];
+    F32FFT fft(N, trig_area);
+
+
+
+
 }
 
 int main(int, const char**) {
     test_set_1();
+    test_set_2();
 }
+
+

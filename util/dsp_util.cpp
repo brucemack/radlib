@@ -2,6 +2,12 @@
 
 namespace radlib {
 
+void add_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n) {
+    for (unsigned int i = 0; i < n; i++) {
+        p[i] = a[i].add(b[i]);
+    }
+}
+
 void mult_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n) {
     for (unsigned int i = 0; i < n; i++) {
         p[i] = a[i].mult(b[i]);

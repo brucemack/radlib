@@ -29,11 +29,15 @@ struct cf32 {
     float magSquared() const {
         return r * r + i * i;
     }
+    cf32 add(cf32 b) const {
+        return cf32(r + b.r, i + b.i);
+    }
     cf32 mult(cf32 b) const {
         return cf32(r * b.r - i * b.i, r * b.i + i * b.r);
     }
 };
 
+void add_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n);
 void mult_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n);
 
 /**
