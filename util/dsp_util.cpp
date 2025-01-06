@@ -37,7 +37,7 @@ float pi() {
     return PI;
 }
 
-void convertf32cf32(uint16_t n, float* realData, cf32* complexData) {
+void convert_f32_cf32(cf32* complexData, const float* realData, uint16_t n) {
     for (uint16_t i = 0; i < n; i++) {
         complexData[i].r = realData[i];
         complexData[i].i = 0;
@@ -271,6 +271,28 @@ uint16_t maxMagIdx(const cf32* data, uint16_t start, uint16_t dataLen) {
         }
     }
     return maxIdx;
+}
+
+void convolve_f32(f32* out, const f32* in, unsigned int N, const f32* h, 
+    unsigned int HN) {
+    for (unsigned int n = 0; n < N; n++) {
+        float sumOfProducts = 0;
+        for (unsigned k = 0; k < HN; k++) {
+            // We convolve forward through the impulse response(h) and backwards
+            // through the signal (in). Pad the negative history of the signal 
+            // series with zeros.
+            f32 xPadded = (n >= k) ? in[n - k] : 0.0;
+            sumOfProducts += xPadded * h[k];
+        }
+        out[n] = sumOfProducts;
+    }
+}
+
+void delay_f32(f32* out, const f32* in, unsigned int N, unsigned int delay) {
+    for (unsigned int n = 0; n < N; n++) {
+        f32 xDelayed = (n >= delay) ? in[n - delay] : 0.0;
+        out[n] = xDelayed;
+    }
 }
 
 }

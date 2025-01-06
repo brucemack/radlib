@@ -1,11 +1,12 @@
 #ifndef _dsp_util_h
 #define _dsp_util_h
 
-//#include <cstdint>
 #include <functional>
 #include <cinttypes>
 
 #include "../util/fixed_math.h"
+
+typedef float f32;
 
 namespace radlib {
 
@@ -24,14 +25,26 @@ struct cf32 {
     cf32(const cf32& other) : r(other.r), i(other.i) { }
 
     float mag() const {
-        return std::sqrt(r * r + i * i);
+        return std::sqrt(magSquared());
     }
     float magSquared() const {
         return r * r + i * i;
     }
+    /**
+     * @returns Phase angle in radians.
+     */
+    float phase() const {
+        return std::atan2(i, r);
+    }
+    /**
+     * @returns this number plus b.
+     */
     cf32 add(cf32 b) const {
         return cf32(r + b.r, i + b.i);
     }
+    /**
+     * @returns this number times b.
+     */
     cf32 mult(cf32 b) const {
         return cf32(r * b.r - i * b.i, r * b.i + i * b.r);
     }
@@ -44,7 +57,7 @@ void mult_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n);
 * Populates the complex arrat with the values of the real array, setting the 
 * imaginary part to 0. 
 */
-void convertf32cf32(uint16_t n, float* realData, cf32* complexData);
+void convert_f32_cf32(cf32* complexData, const float* realData, uint16_t n);
 
 /**
  * Adds on to the index and wraps back to zero if necessary.
@@ -127,6 +140,19 @@ void simpleDFT(cf32* in, cf32* out, uint16_t fftN);
  * index with the largets magnitude.
  */
 uint16_t maxMagIdx(const cf32* data, uint16_t start, uint16_t dataLen);
+
+/**
+ * NOTE: The series is pre-padded with zeros and the last samples are 
+ * ignored. This may not be desirable.
+ */
+void convolve_f32(f32* sigQ, const f32* sigI, unsigned int n, const f32* h, 
+    unsigned int hn);
+
+/**
+ * NOTE: The series is pre-padded with zeros and the last samples are 
+ * ignored. This may not be desirable.
+ */
+void delay_f32(f32* out, const f32* in, unsigned int n, unsigned int delay);
 
 }
 

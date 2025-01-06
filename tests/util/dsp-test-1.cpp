@@ -9,9 +9,11 @@
 using namespace std;
 using namespace radlib;
 
-static bool float_close(float a, float b) {
-    return (std::abs(a - b) / b) < 0.01;
+static bool float_close(float a, float b, float error = 0.01) {
+    return (std::abs(a - b) / b) < error;
 }
+
+static const float PI = 3.1415626;
 
 // Some basic sanity checks of real and complex signals.
 static void test_set_1() {
@@ -26,7 +28,7 @@ static void test_set_1() {
     float sigR[N];
     make_real_tone_f32(sigR, N, sample_freq, tone_freq, 1.0);
     cf32 sigC[N];
-    convertf32cf32(N, sigR, sigC);
+    convert_f32_cf32(sigC, sigR, N);
 
     // Check the DFT
     fft.transform(sigC);
@@ -163,15 +165,90 @@ static void test_set_1() {
 
 static void test_set_2() {
     
-    const uint32_t N = 64;
+    const uint32_t N = 256;
     const float sample_freq = 64000;
     const float tone_freq = 2000;
     float trig_area[N];
     F32FFT fft(N, trig_area);
+    unsigned int maxBin;
 
+    // Make a real signal and then convert it to an complex (analytic)
+    // signal.
 
+    // Create the impulse response of a Hilbert transform
+    const unsigned int HN = 16;
+    float h[HN];
+    float sumOfSquares = 0;
+    for (unsigned int k = 0; k < HN; k++) {
+        // n is centered at zero, per the classical definition of h(n)
+        int n = k - HN / 2;
+        // Special case of zero
+        if (n == 0) 
+            h[k] = 0.0;
+        else
+            h[k] = (sample_freq / (PI * n)) * (1.0 - cos(PI * n));
+        sumOfSquares += h[k] * h[k];
+    }
+    float gain = sqrt(sumOfSquares);
+    for (unsigned int k = 0; k < HN; k++) {
+        h[k] /= gain;
+    }
 
+    // Make a real signal. NOTICE: 45 degrees of phase has been added.
+    float sigI[N];
+    make_real_tone_f32(sigI, N, sample_freq, tone_freq, 1.0, 45.0);
+    cf32 sigIC[N];
+    convert_f32_cf32(sigIC, sigI, N);
+    fft.transform(sigIC);
+    // Positive frequencies only
+    maxBin = maxMagIdx(sigIC, 0, N / 2);
+    assert(maxBin == 8);
+    // Half of the power is in the positive bin
+    assert(float_close(0.5, sigIC[maxBin].mag()));
+    // Confirm the 45 degrees of phase
+    float origPhase = 360.0 * (sigIC[maxBin].phase() / (2.0 * PI));
+    assert(float_close(45.0, origPhase));
 
+    // Delay and evalute phase
+    f32 delayedSigI[N];
+    // NOTE: We delay by the calculated group delay. Which is 
+    // appoximately half of the taps on the Hilbert impulse: HN / 2.
+    // It's not exactly half because we are dealing with an even
+    // number of taps.
+    delay_f32(delayedSigI, sigI, N, HN / 2);
+    cf32 delayedSigIC[N];
+    convert_f32_cf32(delayedSigIC, delayedSigI, N);
+    fft.transform(delayedSigIC);
+    // Positive frequencies only
+    maxBin = maxMagIdx(delayedSigIC, 0, N / 2);
+    // Nothing should change here
+    assert(maxBin == 8);
+    // About half of the power is in the positive bin.  
+    // NOTE: We are testing using a slightly smaller power fraction here
+    // because the delayed signal has a discontinuity in it (the blank
+    // spot at the beginning) that cases some spectral leakage.
+    assert(float_close(0.47, delayedSigIC[maxBin].mag()));
+    // Confirm the phase. We should have the original +45 degrees and 
+    // the -90 degrees introduced by the delay.
+    float delayedPhase = 360.0 * (delayedSigIC[maxBin].phase() / (2.0 * PI));
+    assert(float_close(-45.0, delayedPhase));
+
+    // Convolve the original (undelayed) real signal with the Hilbert impulse.
+    float sigQ[N];
+    convolve_f32(sigQ, sigI, N, h, HN);
+    // Show that the frequency hasn't changed, only the phase
+    cf32 sigQC[N];
+    convert_f32_cf32(sigQC, sigQ, N);
+    fft.transform(sigQC);
+    // Positive frequencies only
+    maxBin = maxMagIdx(sigQC, 0, N / 2);
+    assert(maxBin == 8);
+    float newPhase = 360.0 * (sigQC[maxBin].phase() / (2.0 * PI));
+    // The phase of the Hilbert-transformed signal has two factors:
+    // 1. -90 that we expect from the Hilbert transform (the whole point)
+    // 2. -90 that is caused by the group delay of the transformer itself.
+    cout << "new phase " << newPhase << endl;
+    assert(float_close(-135.0, newPhase));
 }
 
 int main(int, const char**) {
