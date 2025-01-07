@@ -247,13 +247,116 @@ static void test_set_2() {
     // The phase of the Hilbert-transformed signal has two factors:
     // 1. -90 that we expect from the Hilbert transform (the whole point)
     // 2. -90 that is caused by the group delay of the transformer itself.
-    cout << "new phase " << newPhase << endl;
     assert(float_close(-135.0, newPhase));
+}
+
+static void test_set_3() {
+    
+    const uint32_t N = 256;
+    const float sample_freq = 64000;
+    float trig_area[N];
+    F32FFT fft(N, trig_area);
+    unsigned int maxBin;
+
+    // 2khZ below carrier
+    int lsb_bucket = 8;
+    // 3kHz above carrier
+    int usb_bucket = 12;
+
+    // Create a two-tone signal at high frequency 
+    f32 sig1[N];
+    make_real_tone_f32(sig1, N, sample_freq, 20000, 1.0);
+    f32 sig2[N];
+    make_real_tone_f32(sig2, N, sample_freq, 25000, 1.0);
+    f32 sig3[N];
+    add_f32(sig3, sig1, sig2, N);
+
+    // Make the Quadrature VFO
+    f32 sig4[N];
+    make_real_tone_f32(sig4, N, sample_freq, 22000);
+    f32 sig5[N];
+    make_real_tone_f32(sig5, N, sample_freq, 22000, 1.0, 90.0);
+
+    // Quadrature mix the two-tone signal
+    f32 sigI[N];
+    mult_f32(sigI, sig4, sig3, N);
+    f32 sigQ[N];
+    mult_f32(sigQ, sig5, sig3, N);
+
+    // Take the Hilbert transform of the Q signal
+    const unsigned int HN = 16;
+    float h[HN];
+    float sumOfSquares = 0;
+    for (unsigned int k = 0; k < HN; k++) {
+        // n is centered at zero, per the classical definition of h(n)
+        int n = k - HN / 2;
+        // Special case of zero
+        if (n == 0) 
+            h[k] = 0.0;
+        else
+            h[k] = (sample_freq / (PI * n)) * (1.0 - cos(PI * n));
+        sumOfSquares += h[k] * h[k];
+    }
+    float gain = sqrt(sumOfSquares);
+    for (unsigned int k = 0; k < HN; k++) {
+        h[k] /= gain;
+    }
+    float sigQ2[N];
+    convolve_f32(sigQ2, sigQ, N, h, HN);
+
+    // Delay the I signal
+    float sigI2[N];
+    delay_f32(sigI2, sigI, N, HN / 2);
+
+    // USB test (validate supression of LSB)
+    {
+        // Combine the two sides to acheive cancelation of the 
+        // upper or lower side-band.
+        // Subtraction cancels the LSB
+        float sigSSB[N];
+        sub_f32(sigSSB, sigI2, sigQ2, N);
+
+        // Check the spectrum of the SSB signal
+        cf32 sigSSBC[N];
+        convert_f32_cf32(sigSSBC, sigSSB, N);
+        fft.transform(sigSSBC);
+        // Positive frequencies only
+        maxBin = maxMagIdx(sigSSBC, 0, N / 2);
+        assert(maxBin == usb_bucket);
+
+        // Look at side-band cancelation
+        float ratio = sigSSBC[lsb_bucket].mag() / sigSSBC[usb_bucket].mag();
+        float ratioDb = 20.0 * std::log10(ratio);
+        cout << "LSB supression dB " << ratioDb << endl;
+    }
+
+    // SUB test (validate supression of USB)
+    {
+        // Combine the two sides to acheive cancelation of the 
+        // upper or lower side-band
+        // Addition cancels the USB
+        float sigSSB[N];
+        add_f32(sigSSB, sigI2, sigQ2, N);
+
+        // Check the spectrum of the SSB signal
+        cf32 sigSSBC[N];
+        convert_f32_cf32(sigSSBC, sigSSB, N);
+        fft.transform(sigSSBC);
+        // Positive frequencies only
+        maxBin = maxMagIdx(sigSSBC, 0, N / 2);
+        assert(maxBin == lsb_bucket);
+
+        // Look at side-band cancelation
+        float ratio = sigSSBC[usb_bucket].mag() / sigSSBC[lsb_bucket].mag();
+        float ratioDb = 20.0 * std::log10(ratio);
+        cout << "USB supression dB " << ratioDb << endl;
+    }
 }
 
 int main(int, const char**) {
     test_set_1();
     test_set_2();
+    test_set_3();
 }
 
 

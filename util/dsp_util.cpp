@@ -14,6 +14,21 @@ void mult_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n) {
     }
 }
 
+void add_f32(f32* c, const f32* a, const f32* b, unsigned int n) {
+    for (unsigned int i = 0; i < n; i++)
+        c[i] = a[i] + b[i];
+}
+
+void sub_f32(f32* c, const f32* a, const f32* b, unsigned int n) {
+    for (unsigned int i = 0; i < n; i++)
+        c[i] = a[i] - b[i];
+}
+
+void mult_f32(f32* c, const f32* a, const f32* b, unsigned int n) {
+    for (unsigned int i = 0; i < n; i++)
+        c[i] = a[i] * b[i];
+}
+
 uint16_t incAndWrap(uint16_t i, uint16_t size) {
     uint16_t result = i + 1;
     if (result == size) {
@@ -57,7 +72,7 @@ void visit_real_tone(uint32_t len, float sample_freq_hz, float tone_freq_hz,
     }
 }
 
-void addTone(q15* output, 
+void add_real_tone_q15(q15* output, 
     const unsigned int len, float sample_freq_hz, 
     float tone_freq_hz, float amplitude, float phase_degrees) {
     // Make the callback for each point

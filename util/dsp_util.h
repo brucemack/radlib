@@ -54,7 +54,14 @@ void add_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n);
 void mult_complex(cf32* p, const cf32* a, const cf32* b, unsigned int n);
 
 /**
-* Populates the complex arrat with the values of the real array, setting the 
+ * Adds two vectors
+ */
+void add_f32(f32* c, const f32* a, const f32* b, unsigned int n);
+void sub_f32(f32* c, const f32* a, const f32* b, unsigned int n);
+void mult_f32(f32* c, const f32* a, const f32* b, unsigned int n);
+
+/**
+* Populates the complex array with the values of the real array, setting the 
 * imaginary part to 0. 
 */
 void convert_f32_cf32(cf32* complexData, const float* realData, uint16_t n);
@@ -100,7 +107,7 @@ void visit_real_tone(uint32_t len, float sample_freq_hz, float tone_freq_hz,
  */
 void make_real_tone_f32(float* output, const uint16_t len, 
     float sample_freq_hz, float tone_freq_hz, 
-    float amplitude, float phase_degrees = 0);
+    float amplitude = 1.0, float phase_degrees = 0);
 
 /**
  * Fills a buffer with a real sinusoidal signal of the specified amplitude/frequency/
@@ -114,7 +121,7 @@ void make_real_tone_distorted(q15* output, const unsigned int len,
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude = 1.0, float phaseDegrees = 0, float dcOffset = 0);
 
-void addTone(q15* output, 
+void add_real_tone_q15(q15* output, 
     const unsigned int len, float sample_freq_hz, 
     float tone_freq_hz, float amplitude = 1.0, float phaseDegrees = 0);
 
@@ -123,7 +130,7 @@ void addTone(q15* output,
  */
 void make_complex_tone_cf32(cf32* output, uint16_t len, 
     float sample_freq_hz, float tone_freq_hz, 
-    float amplitude, float phaseDegrees = 0);
+    float amplitude = 1.0, float phaseDegrees = 0);
 
 void make_complex_tone_cq15(cq15* output, unsigned int len, 
     float sample_freq_hz, float tone_freq_hz, 
