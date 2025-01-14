@@ -259,9 +259,9 @@ static void test_set_3() {
     unsigned int maxBin;
 
     // 2khZ below carrier
-    int lsb_bucket = 8;
+    unsigned int lsb_bucket = 8;
     // 3kHz above carrier
-    int usb_bucket = 12;
+    unsigned int usb_bucket = 12;
 
     // Create a two-tone signal at high frequency 
     f32 sig1[N];
@@ -330,7 +330,7 @@ static void test_set_3() {
         cout << "LSB supression dB " << ratioDb << endl;
     }
 
-    // SUB test (validate supression of USB)
+    // LSB test (validate supression of USB)
     {
         // Combine the two sides to acheive cancelation of the 
         // upper or lower side-band
@@ -353,10 +353,161 @@ static void test_set_3() {
     }
 }
 
+static void test_set_4() {
+    
+    const uint32_t N = 256;
+    const float sample_freq = 64000;
+    // The carrier frequency
+    const float tune_freq = 22000;
+    // The LSB tone, below carrier
+    const float tone_0 = -2000;
+    // The USB tone, above carrier
+    const float tone_1 = +3000;
+
+    float trig_area[N];
+    F32FFT fft(N, trig_area);
+    unsigned int maxBin;
+
+    // Build the two-tone test
+    const unsigned int SN = 1024;
+
+    f32 sig0[SN];
+    make_real_tone_f32(sig0, SN, sample_freq, tune_freq + tone_0, 1.0);
+    f32 sig1[SN];
+    make_real_tone_f32(sig1, SN, sample_freq, tune_freq + tone_1, 1.0);
+    f32 sigRF[SN];
+    add_f32(sigRF, sig0, sig1, SN);
+
+    // Make the Quadrature VFO
+    f32 sigVFO0[SN];
+    make_real_tone_f32(sigVFO0, SN, sample_freq, tune_freq, 1.0, 0);
+    f32 sigVFO1[SN];
+    make_real_tone_f32(sigVFO1, SN, sample_freq, tune_freq, 1.0, 90.0);
+
+    // Quadrature mix the two-tone signal
+    f32 sigI[SN];
+    mult_f32(sigI, sigVFO0, sigRF, SN);
+    f32 sigQ[SN];
+    mult_f32(sigQ, sigVFO1, sigRF, SN);
+
+    // Make the Hilbert transform impulse.
+    const unsigned int HN = 31;
+    const float h[HN] = {
+0.004195635890348866, -1.2790256324988477e-15, 0.009282101548804558, -3.220409857465908e-16, 0.01883580699770617, -8.18901417658659e-16, 0.03440100801932521, -6.356643085811313e-16, 0.059551575569702433, -8.708587876669048e-16, 0.10303763641989427, -6.507176308640055e-16, 0.19683153562363995, -1.8755360872545065e-16, 0.6313536408821954, 0, -0.6313536408821954, 1.8755360872545065e-16, -0.19683153562363995, 6.507176308640055e-16, -0.10303763641989427, 8.708587876669048e-16, -0.059551575569702433, 6.356643085811313e-16, -0.03440100801932521, 8.18901417658659e-16, -0.01883580699770617, 3.220409857465908e-16, -0.009282101548804558, 1.2790256324988477e-15, -0.004195635890348866
+    };
+    /*
+    const float h[HN] = {
+        0.020501678803366043, 
+        -8.936550362402313e-06, 
+        0.02134400086199499, 
+        -1.5250983261459488e-05, 
+        0.0326520397486797, 
+        -1.994669152567787e-05, 
+        0.04875589796856797, 
+        -5.669758982698511e-06, 
+        0.07296281528723697, 
+        -6.837180026556937e-06, 
+        0.11398417398227445, 
+        -2.125424521352453e-05, 
+        0.204017329268537, 
+        -4.5917661706658896e-06, 
+        0.633845838579163, 
+        0, 
+        -0.633845838579163, 
+        4.5917661706658896e-06, 
+        -0.204017329268537, 
+        2.125424521352453e-05, 
+        -0.11398417398227445, 
+        6.837180026556937e-06, 
+        -0.07296281528723697, 
+        5.669758982698511e-06, 
+        -0.04875589796856797, 
+        1.994669152567787e-05, 
+        -0.0326520397486797, 
+        1.5250983261459488e-05, 
+        -0.02134400086199499, 
+        8.936550362402313e-06, 
+        -0.020501678803366043
+    };
+    */
+    float delayLineI[HN];
+    float delayLineQ[HN];
+
+    for (unsigned int i = 0; i < HN; i++) {
+        delayLineI[i] = 0;
+        delayLineQ[i] = 0;
+    }
+
+    float out[N];
+
+    for (unsigned int i = 0; i < N; i++) {
+        out[i] = 0;
+    }
+
+    // ===== Radio Loop ===================================================
+
+    for (unsigned int n = 0; n < SN; n++) {
+
+        // Shift the delay lines to the left
+        for (unsigned int i = 0; i < HN - 1; i++) {
+            delayLineI[i] = delayLineI[i + 1];
+            delayLineQ[i] = delayLineQ[i + 1];
+        }
+        // Load latest samples onto the end of the delay line
+        delayLineI[HN - 1] = sigI[n];
+        delayLineQ[HN - 1] = sigQ[n];
+
+        // Shift the output buffer
+        for (unsigned int i = 0; i < N - 1; i++)
+            out[i] = out[i + 1];
+
+        // Perform Hilbert transform on Q
+        float rq = 0;
+        // Convolution - there is a flip here
+        for (unsigned int i = 0; i < HN; i++)
+            rq += h[i] * delayLineQ[HN - i - 1];
+        // Pull the I data off the delay line according to the group delay
+        // See pg. 202 in Lyons 1st Ed
+        float ri = delayLineI[((HN - 1) / 2)];
+
+        // LSB
+        //out[N - 1] = rq + ri;
+        // USB
+        out[N - 1] = rq - ri;
+    }
+
+    // Check the spectrum of the SSB signal
+    cf32 sigSSBC[N];
+    convert_f32_cf32(sigSSBC, out, N);
+    fft.transform(sigSSBC);
+    // Positive frequencies only, with limits to avoid seeing
+    // aliases on the high end of the N/2 space.
+    maxBin = maxMagIdx(sigSSBC, 0, N / 4);
+    cout << "Max Freq " << (sample_freq / N) * maxBin << endl;
+    // Find second loudest freq
+    float nextMax = 0;
+    unsigned int nextMaxBin = 0;
+    // Limiting this to avoid seeing aliases
+    for (unsigned int i = 0; i < N / 4; i++) {
+        if (i != maxBin && sigSSBC[i].mag() > nextMax) {
+            nextMax = sigSSBC[i].mag();
+            nextMaxBin = i;
+        }
+    }
+    cout << "Next Max Freq " << (sample_freq / N) * nextMaxBin << endl;
+    float ratio = sigSSBC[nextMaxBin].mag() / sigSSBC[maxBin].mag();
+    cout << "Next Max Supression " << 20 * std::log10(ratio) << endl;
+
+    //for (int i = 0; i < N / 2; i++) {
+    //    cout << i << " " << sigSSBC[i].mag() << endl;
+    //}
+}
+
 int main(int, const char**) {
     test_set_1();
     test_set_2();
-    test_set_3();
+    //test_set_3();
+    test_set_4();
 }
 
 
