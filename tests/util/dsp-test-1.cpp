@@ -353,6 +353,10 @@ static void test_set_3() {
     }
 }
 
+/*
+This is a cool demonstration of using a Hilbert transform to 
+perform opposite sideband supression.
+*/
 static void test_set_4() {
     
     const uint32_t N = 256;
@@ -391,54 +395,51 @@ static void test_set_4() {
     mult_f32(sigQ, sigVFO1, sigRF, SN);
 
     // Make the Hilbert transform impulse.
+    // This impulse response was generated using the Parks-McClellan 
+    // algorithm with band edges 0.05->0.45, response 1.0, weight 1.0.
     const unsigned int HN = 31;
     const float h[HN] = {
-0.004195635890348866, -1.2790256324988477e-15, 0.009282101548804558, -3.220409857465908e-16, 0.01883580699770617, -8.18901417658659e-16, 0.03440100801932521, -6.356643085811313e-16, 0.059551575569702433, -8.708587876669048e-16, 0.10303763641989427, -6.507176308640055e-16, 0.19683153562363995, -1.8755360872545065e-16, 0.6313536408821954, 0, -0.6313536408821954, 1.8755360872545065e-16, -0.19683153562363995, 6.507176308640055e-16, -0.10303763641989427, 8.708587876669048e-16, -0.059551575569702433, 6.356643085811313e-16, -0.03440100801932521, 8.18901417658659e-16, -0.01883580699770617, 3.220409857465908e-16, -0.009282101548804558, 1.2790256324988477e-15, -0.004195635890348866
-    };
-    /*
-    const float h[HN] = {
-        0.020501678803366043, 
-        -8.936550362402313e-06, 
-        0.02134400086199499, 
-        -1.5250983261459488e-05, 
-        0.0326520397486797, 
-        -1.994669152567787e-05, 
-        0.04875589796856797, 
-        -5.669758982698511e-06, 
-        0.07296281528723697, 
-        -6.837180026556937e-06, 
-        0.11398417398227445, 
-        -2.125424521352453e-05, 
-        0.204017329268537, 
-        -4.5917661706658896e-06, 
-        0.633845838579163, 
+        0.004195635890348866, 
+        -1.2790256324988477e-15, 
+        0.009282101548804558, 
+        -3.220409857465908e-16, 
+        0.01883580699770617, 
+        -8.18901417658659e-16, 
+        0.03440100801932521, 
+        -6.356643085811313e-16, 
+        0.059551575569702433, 
+        -8.708587876669048e-16, 
+        0.10303763641989427, 
+        -6.507176308640055e-16, 
+        0.19683153562363995, 
+        -1.8755360872545065e-16, 
+        0.6313536408821954, 
         0, 
-        -0.633845838579163, 
-        4.5917661706658896e-06, 
-        -0.204017329268537, 
-        2.125424521352453e-05, 
-        -0.11398417398227445, 
-        6.837180026556937e-06, 
-        -0.07296281528723697, 
-        5.669758982698511e-06, 
-        -0.04875589796856797, 
-        1.994669152567787e-05, 
-        -0.0326520397486797, 
-        1.5250983261459488e-05, 
-        -0.02134400086199499, 
-        8.936550362402313e-06, 
-        -0.020501678803366043
+        -0.6313536408821954, 
+        1.8755360872545065e-16, 
+        -0.19683153562363995, 
+        6.507176308640055e-16, 
+        -0.10303763641989427, 
+        8.708587876669048e-16, 
+        -0.059551575569702433, 
+        6.356643085811313e-16, 
+        -0.03440100801932521, 
+        8.18901417658659e-16, 
+        -0.01883580699770617, 
+        3.220409857465908e-16, 
+        -0.009282101548804558, 
+        1.2790256324988477e-15, 
+        -0.004195635890348866
     };
-    */
+
     float delayLineI[HN];
     float delayLineQ[HN];
+    float out[N];
 
     for (unsigned int i = 0; i < HN; i++) {
         delayLineI[i] = 0;
         delayLineQ[i] = 0;
     }
-
-    float out[N];
 
     for (unsigned int i = 0; i < N; i++) {
         out[i] = 0;
@@ -448,18 +449,18 @@ static void test_set_4() {
 
     for (unsigned int n = 0; n < SN; n++) {
 
-        // Shift the delay lines to the left
+        // Shift the delay lines and output buffer to the left
         for (unsigned int i = 0; i < HN - 1; i++) {
             delayLineI[i] = delayLineI[i + 1];
             delayLineQ[i] = delayLineQ[i + 1];
         }
-        // Load latest samples onto the end of the delay line
-        delayLineI[HN - 1] = sigI[n];
-        delayLineQ[HN - 1] = sigQ[n];
-
-        // Shift the output buffer
         for (unsigned int i = 0; i < N - 1; i++)
             out[i] = out[i + 1];
+
+        // Load latest received I/Q samples onto the right side
+        // of the delay line.
+        delayLineI[HN - 1] = sigI[n];
+        delayLineQ[HN - 1] = sigQ[n];
 
         // Perform Hilbert transform on Q
         float rq = 0;
@@ -470,6 +471,8 @@ static void test_set_4() {
         // See pg. 202 in Lyons 1st Ed
         float ri = delayLineI[((HN - 1) / 2)];
 
+        // This is where we decide which side-band to look at and 
+        // which side-band to supress.
         // LSB
         //out[N - 1] = rq + ri;
         // USB
@@ -483,11 +486,11 @@ static void test_set_4() {
     // Positive frequencies only, with limits to avoid seeing
     // aliases on the high end of the N/2 space.
     maxBin = maxMagIdx(sigSSBC, 0, N / 4);
-    cout << "Max Freq " << (sample_freq / N) * maxBin << endl;
+    cout << "First Max Freq " << (sample_freq / N) * maxBin << endl;
     // Find second loudest freq
     float nextMax = 0;
     unsigned int nextMaxBin = 0;
-    // Limiting this to avoid seeing aliases
+    // Limiting this to avoid seeing the mixing aliases
     for (unsigned int i = 0; i < N / 4; i++) {
         if (i != maxBin && sigSSBC[i].mag() > nextMax) {
             nextMax = sigSSBC[i].mag();
@@ -506,7 +509,7 @@ static void test_set_4() {
 int main(int, const char**) {
     test_set_1();
     test_set_2();
-    //test_set_3();
+    test_set_3();
     test_set_4();
 }
 
