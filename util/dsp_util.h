@@ -99,13 +99,13 @@ uint16_t wrapIndex(uint16_t base, uint16_t disp, uint16_t size);
  * Visits points on a real-valued sinusoidal tone.
  */
 void visit_real_tone(uint32_t len, float sample_freq_hz, float tone_freq_hz,
-    float amplitude, float phaseDegrees, std::function<void(uint16_t idx, float y)> cb);
+    float amplitude, float phaseDegrees, std::function<void(uint32_t idx, float y)> cb);
 
 /**
  * Fills a buffer with a real sinusoidal signal of the specified amplitude/frequency/
  * phase.
  */
-void make_real_tone_f32(float* output, const uint16_t len, 
+void make_real_tone_f32(float* output, const uint32_t len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude = 1.0, float phase_degrees = 0);
 
@@ -128,7 +128,7 @@ void add_real_tone_q15(q15* output,
 /**
  * Creates a complex (quadrature) tone.
  */
-void make_complex_tone_cf32(cf32* output, uint16_t len, 
+void make_complex_tone_cf32(cf32* output, uint32_t len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude = 1.0, float phaseDegrees = 0);
 

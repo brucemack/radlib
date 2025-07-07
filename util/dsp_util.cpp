@@ -92,7 +92,7 @@ void make_real_tone_q15(q15* output,
     visit_real_tone(len, sample_freq_hz, tone_freq_hz, amplitude, phase_degrees, cb);
 }
 
-void make_real_tone_f32(float* output, const uint16_t len, 
+void make_real_tone_f32(float* output, const uint32_t len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude, float phase_degrees) {
     // Make the callback for each point
@@ -127,7 +127,7 @@ void make_complex_tone_cq15(cq15* output, unsigned int len, float sample_freq_hz
     }
 }
 
-void make_complex_tone_cf32(cf32* output, uint16_t len, 
+void make_complex_tone_cf32(cf32* output, uint32_t len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude, float phase_degrees) {
 
