@@ -117,6 +117,10 @@ void make_real_tone_q15(q15* output, const unsigned int len,
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude = 1.0, float phase_degrees = 0);
 
+void make_real_tone_q31(q31* output, const uint32_t len, 
+    float sample_freq_hz, float tone_freq_hz, 
+    float amplitude = 1.0, float phase_degrees = 0);
+
 void make_real_tone_distorted(q15* output, const unsigned int len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude = 1.0, float phaseDegrees = 0, float dcOffset = 0);

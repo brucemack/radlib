@@ -92,6 +92,16 @@ void make_real_tone_q15(q15* output,
     visit_real_tone(len, sample_freq_hz, tone_freq_hz, amplitude, phase_degrees, cb);
 }
 
+void make_real_tone_q31(q31* output, 
+    const unsigned int len, float sample_freq_hz, 
+    float tone_freq_hz, float amplitude, float phase_degrees) {
+    // Make the callback for each point
+    std::function<void(unsigned int, float)> cb = [output](unsigned int ix, float x) {
+        output[ix] = f32_to_q31(x);
+    };
+    visit_real_tone(len, sample_freq_hz, tone_freq_hz, amplitude, phase_degrees, cb);
+}
+
 void make_real_tone_f32(float* output, const uint32_t len, 
     float sample_freq_hz, float tone_freq_hz, 
     float amplitude, float phase_degrees) {

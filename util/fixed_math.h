@@ -22,11 +22,13 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cmath>
 
 typedef int16_t q15;
+typedef int32_t q31;
 
 // For multiplication we use a 32-bit result to avoid loss of the fraction
 #define mult_q15(a,b) ( (q15)((((int32_t)(a)) * ((int32_t)(b))) >> 15) )
 #define q15_to_f32(a) ((float)(a) / 32768.0f)
 #define f32_to_q15(a) ((q15)((a) * 32768.0f)) 
+#define f32_to_q31(a) ((q31)((a) * 2147483648.0f)) 
 #define int_to_q15(a) ((q15)(a << 15))
 #define q15_to_int(a) ((int)(a >> 15))
 #define char_to_q15(a) (q15)(((q15)(a)) << 15)
